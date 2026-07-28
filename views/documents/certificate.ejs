@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Certificate <%= booking.certificate.number %></title>
+<style>
+  :root { --navy:#10243f; --blue:#1b9dd9; --amber:#f6a623; --ink:#1b2b3a; --muted:#5b6b7a; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: var(--ink); margin: 0; background:#eef2f6; }
+  .sheet {
+    width: 1040px; max-width: 100%; margin: 20px auto; background:#fff; position: relative;
+    border: 3px solid var(--navy); border-radius: 14px; padding: 44px 56px;
+  }
+  .sheet::before {
+    content:''; position:absolute; inset:10px; border:1px solid #cfe0ee; border-radius:9px; pointer-events:none;
+  }
+  .certno { position:absolute; top:30px; right:56px; font-size:13px; color:var(--muted); }
+  .head { text-align:center; }
+  .drop { width:34px; height:46px; background:var(--navy); border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+          transform: rotate(0deg); margin:0 auto 6px; position:relative; clip-path: polygon(50% 0, 100% 60%, 50% 100%, 0 60%); }
+  .brand { font-size:30px; font-weight:800; color:var(--navy); letter-spacing:.3px; }
+  .brand-sub { letter-spacing:4px; font-size:12px; font-weight:700; color:var(--blue); margin-top:2px; }
+  .title { font-size:40px; font-weight:800; color:var(--navy); margin:18px 0 6px; text-align:center; }
+  .title u { text-decoration: none; border-bottom:4px solid var(--amber); padding-bottom:3px; }
+  .intro { text-align:center; color:var(--muted); max-width:720px; margin:8px auto 26px; line-height:1.5; font-size:14px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px 60px; margin:0 6px; }
+  .field label { display:block; font-size:12px; letter-spacing:1px; font-weight:700; color:var(--blue); margin-bottom:6px; text-transform:uppercase; }
+  .field .val { border-bottom:1.5px solid #b9c7d4; min-height:26px; font-size:16px; padding-bottom:3px; }
+  .perf { margin:26px 6px 0; }
+  .perf .lbl { font-size:12px; letter-spacing:1px; font-weight:700; color:var(--blue); text-transform:uppercase; margin-bottom:10px; }
+  .box { display:inline-block; width:18px; height:18px; border:2px solid var(--navy); border-radius:4px; vertical-align:-4px; margin-right:8px; text-align:center; line-height:15px; color:var(--navy); font-weight:800; }
+  .checked::after { content:'✓'; }
+  .perf-item { display:inline-flex; align-items:center; margin-right:40px; font-size:15px; }
+  .bottom { display:flex; justify-content:space-between; align-items:flex-end; margin-top:34px; }
+  .qr { text-align:center; }
+  .qr img { width:110px; height:110px; }
+  .qr .cap { font-size:11px; letter-spacing:1px; color:var(--blue); font-weight:700; text-transform:uppercase; margin-bottom:6px; }
+  .sign { text-align:center; flex:1; margin:0 30px; }
+  .sign .line { border-top:1.5px solid #94a6b4; margin-top:44px; padding-top:6px; color:var(--muted); font-size:13px; }
+  .stamp { width:96px; height:96px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; text-align:center; font-size:10px; font-weight:700; border:3px dotted var(--amber); }
+  .foot { text-align:center; color:var(--muted); font-size:12px; margin-top:26px; }
+  .toolbar { text-align:center; margin:16px; }
+  .toolbar button { background:var(--navy); color:#fff; border:0; padding:10px 22px; border-radius:8px; font-size:14px; cursor:pointer; }
+  @media print { .toolbar { display:none; } body { background:#fff; } .sheet { margin:0; border-width:3px; } @page { size: A4 landscape; margin:10mm; } }
+</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
+<%
+  const tanks = booking.tanks.map(t => `${t.quantity}× ${t.label}`).join(', ');
+  const dateSvc = new Date(booking.bookingDate).toLocaleDateString('en-GB');
+  const nextDue = booking.certificate.nextServiceDue ? new Date(booking.certificate.nextServiceDue).toLocaleDateString('en-GB') : '';
+  const isStd = booking.serviceTier === 'standard';
+%>
+<div class="sheet">
+  <div class="certno">Certificate No. <strong><%= booking.certificate.number %></strong></div>
+  <div class="head">
+    <div class="drop"></div>
+    <div class="brand"><%= cfg.businessInfo.name %></div>
+    <div class="brand-sub">WATER TANK CLEANING &amp; DISINFECTION</div>
+  </div>
+  <div class="title">Certificate of <u>Cleaning &amp; Disinfection</u></div>
+  <div class="intro">
+    This certifies that the water storage tank described below was professionally cleaned and
+    disinfected by <%= cfg.businessInfo.name %> using our no-entry method, and its free-chlorine residual
+    confirmed to a safe, potable level before hand-over.
+  </div>
+
+  <div class="grid">
+    <div class="field"><label>Client Name</label><div class="val"><%= booking.clientName %></div></div>
+    <div class="field"><label>Date of Service</label><div class="val"><%= dateSvc %></div></div>
+    <div class="field"><label>Property / Address</label><div class="val"><%= booking.location.address || '' %></div></div>
+    <div class="field"><label>Free-Chlorine Residual (mg/L)</label><div class="val"><%= booking.certificate.freeChlorineResidual || '' %></div></div>
+    <div class="field"><label>Tank Type &amp; Capacity</label><div class="val"><%= tanks %></div></div>
+    <div class="field"><label>Next Service Due</label><div class="val"><%= nextDue %></div></div>
+  </div>
+
+  <div class="perf">
+    <div class="lbl">Service Performed</div>
+    <span class="perf-item"><span class="box <%= isStd ? 'checked' : '' %>"></span> Standard Clean</span>
+    <span class="perf-item"><span class="box <%= !isStd ? 'checked' : '' %>"></span> Clean-and-Preserve</span>
+  </div>
+
+  <div class="bottom">
+    <div class="qr">
+      <div class="cap">Scan to re-book</div>
+      <% if (qr) { %><img src="<%= qr %>" alt="QR" /><% } %>
+    </div>
+    <div class="sign">
+      <div class="line"><%= booking.certificate.technician || 'Technician / Authorised signature' %></div>
+    </div>
+    <div class="stamp">CLEANED &amp;<br />DISINFECTED</div>
+  </div>
+
+  <div class="foot">
+    <%= cfg.businessInfo.subsidiaryOf %> &middot; <%= cfg.businessInfo.phone %> &middot; <%= cfg.businessInfo.address %>
+  </div>
+</div>
+</body>
+</html>

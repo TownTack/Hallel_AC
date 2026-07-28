@@ -1,0 +1,36 @@
+:root {
+  --hallel-navy: #10243f;
+  --hallel-blue: #1b9dd9;
+  --hallel-ink: #1b2b3a;
+  --hallel-amber: #f6a623;
+}
+
+body { background: #f4f7fa; color: var(--hallel-ink); }
+
+.hallel-navbar { background: var(--hallel-navy); }
+.hallel-navbar .navbar-brand { color: #fff; }
+.brand-drop { color: var(--hallel-blue); font-size: 1.2rem; }
+
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.app-shell main { flex: 1; }
+
+/* Booking form */
+.booking-card { border: none; border-radius: 1rem; box-shadow: 0 10px 30px rgba(16,36,63,.08); }
+.section-title { color: var(--hallel-navy); font-weight: 700; letter-spacing: .02em; }
+.tank-row { background: #fff; border: 1px solid #e6edf3; border-radius: .6rem; }
+#map { height: 320px; border-radius: .6rem; border: 1px solid #e6edf3; }
+
+.summary-box { background: var(--hallel-navy); color: #fff; border-radius: 1rem; }
+.summary-box .total { font-size: 1.8rem; font-weight: 700; }
+.badge-free { background: #1a9e5f; }
+.badge-fee { background: var(--hallel-amber); color: #10243f; }
+
+/* Admin */
+.booking-tile { cursor: pointer; transition: transform .1s ease, box-shadow .1s ease; }
+.booking-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(16,36,63,.12); }
+.status-dot { width: .7rem; height: .7rem; border-radius: 50%; display: inline-block; }
+.status-paid { background: #1a9e5f; }
+.status-deposit { background: var(--hallel-amber); }
+.status-unpaid { background: #c0392b; }
+
+.stat-card { border-radius: .8rem; border: none; box-shadow: 0 6px 18px rgba(16,36,63,.06); }

@@ -1,0 +1,90 @@
+<% layout('layouts/boilerplate') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="section-title mb-0">Settings</h2>
+  <a href="/admin" class="btn btn-outline-secondary btn-sm">← Dashboard</a>
+</div>
+
+<form action="/admin/settings" method="POST">
+  <!-- Base location & transport -->
+  <div class="card booking-card p-4 mb-4">
+    <h5 class="section-title mb-3">Base location &amp; transport</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Base name</label>
+        <input name="baseName" class="form-control" value="<%= cfg.baseLocation.name %>" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Base latitude</label>
+        <input name="baseLat" type="number" step="any" class="form-control" value="<%= cfg.baseLocation.lat %>" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Base longitude</label>
+        <input name="baseLng" type="number" step="any" class="form-control" value="<%= cfg.baseLocation.lng %>" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Free radius (km)</label>
+        <input name="freeRadiusKm" type="number" step="any" class="form-control" value="<%= cfg.freeRadiusKm %>" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Rate per extra km (GHS)</label>
+        <input name="transportRatePerKm" type="number" step="any" class="form-control" value="<%= cfg.transportRatePerKm %>" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Min call-out fee (GHS)</label>
+        <input name="minCallOutFee" type="number" step="any" class="form-control" value="<%= cfg.minCallOutFee %>" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Distance provider</label>
+        <select name="distanceProvider" class="form-select">
+          <option value="haversine" <%= cfg.distanceProvider === 'haversine' ? 'selected' : '' %>>Haversine (free)</option>
+          <option value="google" <%= cfg.distanceProvider === 'google' ? 'selected' : '' %>>Google (driving)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="card booking-card p-4 mb-4">
+    <h5 class="section-title mb-3">Notifications</h5>
+    <div class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">Admin notify number (SMS)</label>
+        <input name="adminNotifyNumber" class="form-control" placeholder="233530551604" value="<%= cfg.adminNotifyNumber %>" />
+      </div>
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="notificationsEnabled" id="notifEnabled" <%= cfg.notificationsEnabled ? 'checked' : '' %> />
+          <label class="form-check-label" for="notifEnabled">Send booking SMS notifications</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price list -->
+  <div class="card booking-card p-4 mb-4">
+    <h5 class="section-title mb-3">Tank price list (GHS)</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr><th>Size key</th><th>Label</th><th>Litres</th><th>Standard</th><th>Preserve</th><th>Custom</th></tr>
+        </thead>
+        <tbody>
+          <% cfg.priceList.forEach(p => { %>
+            <tr>
+              <td><input name="sizeKey" class="form-control form-control-sm" value="<%= p.sizeKey %>" readonly style="max-width:120px" /></td>
+              <td><input name="label" class="form-control form-control-sm" value="<%= p.label %>" /></td>
+              <td><input name="capacityLitres" type="number" class="form-control form-control-sm" value="<%= p.capacityLitres %>" style="max-width:100px" /></td>
+              <td><input name="standardPrice" type="number" step="any" class="form-control form-control-sm" value="<%= p.standardPrice %>" style="max-width:100px" /></td>
+              <td><input name="preservePrice" type="number" step="any" class="form-control form-control-sm" value="<%= p.preservePrice %>" style="max-width:100px" /></td>
+              <td class="text-center"><input type="checkbox" name="custom" value="<%= p.sizeKey %>" <%= p.custom ? 'checked' : '' %> /></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted small mb-0">Size keys are fixed identifiers — edit labels and prices freely. "Custom" flags sizes we quote manually.</p>
+  </div>
+
+  <button class="btn btn-primary" type="submit">Save settings</button>
+</form>

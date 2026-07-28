@@ -1,0 +1,19 @@
+<nav class="navbar navbar-expand-lg navbar-dark hallel-navbar">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+      <span class="brand-drop">&#9679;</span>
+      <span>Hallel <strong>AquaCare</strong></span>
+    </a>
+    <div class="ms-auto d-flex gap-2">
+      <a class="btn btn-sm btn-light" href="/">Book a clean</a>
+      <% if (currentUser) { %>
+        <a class="btn btn-sm btn-outline-light" href="/admin">Dashboard</a>
+        <form action="/admin/logout?_method=DELETE" method="POST" class="d-inline">
+          <button class="btn btn-sm btn-outline-light" type="submit">Logout</button>
+        </form>
+      <% } else { %>
+        <a class="btn btn-sm btn-outline-light" href="/admin/login">Admin</a>
+      <% } %>
+    </div>
+  </div>
+</nav>

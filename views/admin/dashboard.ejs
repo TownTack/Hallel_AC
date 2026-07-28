@@ -1,0 +1,75 @@
+<% layout('layouts/boilerplate') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="section-title mb-0">Bookings</h2>
+  <a href="/admin/settings" class="btn btn-outline-secondary btn-sm">Settings</a>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Total</div><div class="h4 mb-0"><%= stats.total %></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Unpaid</div><div class="h4 mb-0 text-danger"><%= stats.unpaid %></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Paid</div><div class="h4 mb-0 text-success"><%= stats.paid %></div></div></div>
+  <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Jobs pending</div><div class="h4 mb-0"><%= stats.pendingJobs %></div></div></div>
+</div>
+
+<!-- Filters -->
+<form class="row g-2 mb-4" method="GET">
+  <div class="col-md-3"><input class="form-control form-control-sm" name="q" placeholder="Search name…" value="<%= query.q || '' %>" /></div>
+  <div class="col-md-3">
+    <select class="form-select form-select-sm" name="status">
+      <option value="">All payment statuses</option>
+      <% ['unpaid','deposit_paid','paid'].forEach(s => { %>
+        <option value="<%= s %>" <%= query.status === s ? 'selected' : '' %>><%= s %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select form-select-sm" name="job">
+      <option value="">All jobs</option>
+      <option value="pending" <%= query.job === 'pending' ? 'selected' : '' %>>Job pending</option>
+      <option value="completed" <%= query.job === 'completed' ? 'selected' : '' %>>Job completed</option>
+    </select>
+  </div>
+  <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">Filter</button></div>
+</form>
+
+<!-- Cards -->
+<% if (!bookings.length) { %>
+  <p class="text-muted">No bookings yet.</p>
+<% } %>
+<div class="row g-3">
+  <% bookings.forEach(b => {
+       const st = b.payment.status;
+       const dot = st === 'paid' ? 'status-paid' : (st === 'deposit_paid' ? 'status-deposit' : 'status-unpaid');
+  %>
+    <div class="col-md-6 col-xl-4">
+      <div class="card booking-tile p-3 h-100" data-id="<%= b._id %>">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-bold"><%= b.clientName %></div>
+            <div class="small text-muted"><%= b.whatsapp %></div>
+          </div>
+          <span class="status-dot <%= dot %>" title="<%= st %>"></span>
+        </div>
+        <div class="small mt-2">
+          <div><%= new Date(b.bookingDate).toLocaleDateString('en-GB') %> &middot; <%= b.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard' %></div>
+          <div><%= b.tanks.reduce((s,t)=>s+t.quantity,0) %> tank(s) &middot; <strong>GHS <%= b.pricing.total.toFixed(2) %></strong></div>
+        </div>
+        <div class="mt-2">
+          <% if (b.jobCompleted) { %><span class="badge bg-success">Job done</span><% } else { %><span class="badge bg-secondary">Job pending</span><% } %>
+          <% if (!b.transport.free) { %><span class="badge badge-fee">Transport GHS <%= b.transport.fee.toFixed(2) %></span><% } %>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<!-- Detail modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" id="detailContent"><div class="p-4 text-center text-muted">Loading…</div></div>
+  </div>
+</div>
+
+<script defer src="/js/admin.js"></script>

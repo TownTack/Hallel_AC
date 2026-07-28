@@ -1,0 +1,30 @@
+<% layout('layouts/boilerplate') %>
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card booking-card p-4 p-md-5 text-center">
+      <div class="display-6 mb-2" style="color:var(--hallel-blue)">&#10004;</div>
+      <h2 class="fw-bold" style="color:var(--hallel-navy)">Booking confirmed!</h2>
+      <p class="text-muted">Reference <strong><%= String(booking._id).slice(-6).toUpperCase() %></strong></p>
+
+      <ul class="list-group list-group-flush text-start my-3">
+        <li class="list-group-item d-flex justify-content-between"><span>Name</span><strong><%= booking.clientName %></strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Service date</span><strong><%= new Date(booking.bookingDate).toLocaleDateString('en-GB') %></strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Service</span><strong><%= booking.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard Clean' %></strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Transport</span><strong><%= booking.transport.free ? 'Free' : 'GHS ' + booking.transport.fee.toFixed(2) %></strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Total</span><strong>GHS <%= booking.pricing.total.toFixed(2) %></strong></li>
+      </ul>
+
+      <p class="small text-muted">A confirmation SMS has been sent to <%= booking.whatsapp %>.</p>
+
+      <div class="d-flex gap-2 justify-content-center">
+        <% if (waNumber) { %>
+          <a class="btn btn-success" target="_blank" rel="noopener"
+             href="https://wa.me/<%= waNumber %>?text=<%= encodeURIComponent('Hi Hallel AquaCare, I just booked (ref ' + String(booking._id).slice(-6).toUpperCase() + ').') %>">
+            Message us on WhatsApp
+          </a>
+        <% } %>
+        <a class="btn btn-outline-primary" href="/">Make another booking</a>
+      </div>
+    </div>
+  </div>
+</div>

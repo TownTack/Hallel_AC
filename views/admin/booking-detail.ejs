@@ -1,0 +1,78 @@
+<%
+  const st = booking.payment.status;
+  const badge = st === 'paid' ? 'bg-success' : (st === 'deposit_paid' ? 'bg-warning text-dark' : 'bg-danger');
+%>
+<div class="modal-header">
+  <h5 class="modal-title"><%= booking.clientName %>
+    <span class="badge <%= badge %> ms-2"><%= st.replace('_',' ') %></span>
+  </h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body" data-id="<%= booking._id %>">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <h6 class="section-title">Client</h6>
+      <div class="small">
+        <div>WhatsApp: <strong><%= booking.whatsapp %></strong></div>
+        <% if (booking.email) { %><div>Email: <%= booking.email %></div><% } %>
+        <div>Address: <%= booking.location.address || '—' %></div>
+        <div>Distance: <%= booking.location.distanceKm != null ? booking.location.distanceKm + ' km' : '—' %></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <h6 class="section-title">Service</h6>
+      <div class="small">
+        <div>Date: <strong><%= new Date(booking.bookingDate).toLocaleDateString('en-GB') %></strong></div>
+        <div>Tier: <%= booking.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard Clean' %></div>
+        <ul class="mb-1 ps-3">
+          <% booking.tanks.forEach(t => { %><li><%= t.quantity %>× <%= t.label %> — GHS <%= t.lineTotal.toFixed(2) %></li><% }) %>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr />
+  <div class="row small">
+    <div class="col-6">Tanks subtotal</div><div class="col-6 text-end">GHS <%= booking.pricing.tanksSubtotal.toFixed(2) %></div>
+    <div class="col-6">Transport</div><div class="col-6 text-end"><%= booking.transport.free ? 'Free' : 'GHS ' + booking.transport.fee.toFixed(2) %></div>
+    <div class="col-6 fw-bold">Total</div><div class="col-6 text-end fw-bold">GHS <%= booking.pricing.total.toFixed(2) %></div>
+    <div class="col-6 text-muted">Paid</div><div class="col-6 text-end text-muted">GHS <%= booking.payment.amountPaid.toFixed(2) %> (due GHS <%= booking.payment.amountDue.toFixed(2) %>)</div>
+    <% if (booking.payment.confirmedManually) { %>
+      <div class="col-12 text-muted mt-1">Confirmed by <%= booking.payment.confirmedBy %> on <%= new Date(booking.payment.confirmedAt).toLocaleString('en-GB') %></div>
+    <% } %>
+  </div>
+
+  <hr />
+  <!-- Actions -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <button class="btn btn-sm btn-success js-pay" data-mode="full">Confirm full payment</button>
+    <% if (!booking.transport.free) { %>
+      <button class="btn btn-sm btn-outline-warning js-pay" data-mode="deposit">Confirm deposit only</button>
+    <% } %>
+    <button class="btn btn-sm <%= booking.jobCompleted ? 'btn-secondary' : 'btn-outline-primary' %> js-job">
+      <%= booking.jobCompleted ? 'Mark job pending' : 'Mark job completed' %>
+    </button>
+    <a class="btn btn-sm btn-outline-dark" href="/admin/bookings/<%= booking._id %>/receipt" target="_blank">Generate receipt</a>
+    <a class="btn btn-sm btn-outline-dark" href="/admin/bookings/<%= booking._id %>/certificate" target="_blank">Generate certificate</a>
+  </div>
+
+  <!-- Certificate fields -->
+  <div class="card p-3">
+    <h6 class="section-title">Certificate details</h6>
+    <form class="row g-2 js-cert">
+      <div class="col-md-4">
+        <label class="form-label small">Free-chlorine residual (mg/L)</label>
+        <input name="freeChlorineResidual" class="form-control form-control-sm" value="<%= booking.certificate?.freeChlorineResidual || '' %>" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small">Next service due</label>
+        <input name="nextServiceDue" type="date" class="form-control form-control-sm" value="<%= booking.certificate?.nextServiceDue ? new Date(booking.certificate.nextServiceDue).toISOString().slice(0,10) : '' %>" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small">Technician</label>
+        <input name="technician" class="form-control form-control-sm" value="<%= booking.certificate?.technician || '' %>" />
+      </div>
+      <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Save certificate details</button></div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,116 @@
+<% layout('layouts/boilerplate') %>
+
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <div class="text-center mb-4">
+      <h1 class="fw-bold" style="color:var(--hallel-navy)">Book a Tank Clean &amp; Disinfection</h1>
+      <p class="text-muted">No-entry hygienic method &middot; documented water-quality testing &middot; service certificate on completion</p>
+    </div>
+
+    <form id="bookingForm" action="/booking" method="POST" class="card booking-card p-4 p-md-5" novalidate>
+      <div class="row g-4">
+        <!-- ================= Left: inputs ================= -->
+        <div class="col-lg-7">
+
+          <!-- Contact -->
+          <h5 class="section-title mb-3">Your details</h5>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label">Full name</label>
+              <input name="clientName" class="form-control" required maxlength="120" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">WhatsApp number</label>
+              <input name="whatsapp" class="form-control" placeholder="05x xxx xxxx" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email <span class="text-muted">(optional)</span></label>
+              <input name="email" type="email" class="form-control" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Preferred service date</label>
+              <input name="bookingDate" type="date" class="form-control" required />
+            </div>
+          </div>
+
+          <!-- Service tier -->
+          <h5 class="section-title mb-3">Service type</h5>
+          <div class="btn-group w-100 mb-4" role="group">
+            <input type="radio" class="btn-check" name="serviceTier" id="tierStandard" value="standard" checked />
+            <label class="btn btn-outline-primary" for="tierStandard">
+              Standard Clean<br /><small class="text-muted">fresh refill</small>
+            </label>
+            <input type="radio" class="btn-check" name="serviceTier" id="tierPreserve" value="preserve" />
+            <label class="btn btn-outline-primary" for="tierPreserve">
+              Clean &amp; Preserve<br /><small class="text-muted">your water saved</small>
+            </label>
+          </div>
+
+          <!-- Tanks -->
+          <h5 class="section-title mb-3">Your tanks</h5>
+          <div id="tankRows" class="d-flex flex-column gap-2 mb-2"></div>
+          <button type="button" id="addTank" class="btn btn-sm btn-outline-secondary mb-4">+ Add another tank</button>
+
+          <!-- Location -->
+          <h5 class="section-title mb-3">Your location</h5>
+          <p class="text-muted small mb-2">Search your area or drop the pin on your home. Transport is free within <%= freeRadiusKm %> km of our base.</p>
+          <div class="input-group mb-2">
+            <input id="addressSearch" class="form-control" placeholder="Search area / estate…" />
+            <button type="button" id="searchBtn" class="btn btn-outline-secondary">Search</button>
+            <button type="button" id="myLocationBtn" class="btn btn-outline-secondary">Use my location</button>
+          </div>
+          <div id="map" class="mb-2"></div>
+          <input type="hidden" name="lat" id="lat" />
+          <input type="hidden" name="lng" id="lng" />
+          <input type="hidden" name="address" id="address" />
+          <input type="hidden" name="tanks" id="tanksInput" />
+        </div>
+
+        <!-- ================= Right: live summary ================= -->
+        <div class="col-lg-5">
+          <div class="summary-box p-4 sticky-top" style="top:1rem">
+            <h5 class="mb-3">Summary</h5>
+            <div id="summaryLines" class="small mb-3 text-white-50">Add a tank to see pricing…</div>
+
+            <div class="d-flex justify-content-between"><span>Tanks subtotal</span><span id="sumSubtotal">GHS 0.00</span></div>
+            <div id="minCalloutNote" class="small text-warning d-none">Minimum call-out fee applied.</div>
+
+            <div class="d-flex justify-content-between mt-2">
+              <span>Transport <span id="distanceNote" class="text-white-50"></span></span>
+              <span id="sumTransport"><span class="badge badge-free">FREE</span></span>
+            </div>
+
+            <hr class="text-white-50" />
+            <div class="d-flex justify-content-between align-items-center">
+              <span>Total</span>
+              <span class="total" id="sumTotal">GHS 0.00</span>
+            </div>
+
+            <!-- Pay now -->
+            <div class="mt-4">
+              <label class="form-label">Payment</label>
+              <select name="payNowChoice" id="payNowChoice" class="form-select">
+                <option value="later">Pay later / on-site</option>
+                <option value="now">Pay now</option>
+              </select>
+              <div id="payNote" class="small text-warning mt-2 d-none"></div>
+            </div>
+
+            <button type="submit" id="bookBtn" class="btn btn-light w-100 mt-4 fw-bold">Book Now</button>
+            <div id="customNote" class="small text-warning mt-2 d-none"></div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Config for the client script -->
+<script type="application/json" id="bookingConfig">
+  {
+    "priceList": <%- JSON.stringify(priceList) %>,
+    "baseLocation": <%- JSON.stringify(baseLocation) %>,
+    "freeRadiusKm": <%= freeRadiusKm %>
+  }
+</script>
+<script defer src="/js/booking.js"></script>

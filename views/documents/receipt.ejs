@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Receipt <%= booking.receiptNumber %></title>
+<style>
+  :root { --navy:#10243f; --blue:#1b9dd9; --muted:#5b6b7a; }
+  body { font-family:'Segoe UI', Arial, sans-serif; color:#1b2b3a; background:#eef2f6; margin:0; }
+  .sheet { width:720px; max-width:100%; margin:20px auto; background:#fff; border-radius:12px; padding:40px 48px; border-top:6px solid var(--navy); }
+  .row { display:flex; justify-content:space-between; align-items:flex-start; }
+  .brand { font-size:24px; font-weight:800; color:var(--navy); }
+  .brand-sub { font-size:11px; letter-spacing:3px; color:var(--blue); font-weight:700; }
+  .rcpt { text-align:right; font-size:13px; color:var(--muted); }
+  .rcpt strong { color:#1b2b3a; }
+  h2 { color:var(--navy); font-size:20px; margin:26px 0 14px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid #e2e9ef; }
+  td.num, th.num { text-align:right; }
+  .totals { margin-top:14px; margin-left:auto; width:280px; font-size:14px; }
+  .totals .line { display:flex; justify-content:space-between; padding:5px 0; }
+  .totals .grand { border-top:2px solid var(--navy); font-weight:800; font-size:16px; padding-top:8px; }
+  .paid { color:#1a9e5f; } .due { color:#c0392b; }
+  .foot { text-align:center; color:var(--muted); font-size:12px; margin-top:30px; }
+  .qr { float:right; text-align:center; margin-top:10px; }
+  .qr img { width:90px; height:90px; }
+  .toolbar { text-align:center; margin:16px; }
+  .toolbar button { background:var(--navy); color:#fff; border:0; padding:10px 22px; border-radius:8px; cursor:pointer; }
+  @media print { .toolbar { display:none; } body { background:#fff; } .sheet { margin:0; } @page { size:A4; margin:12mm; } }
+</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
+<%
+  const money = n => 'GHS ' + Number(n||0).toFixed(2);
+  const dateSvc = new Date(booking.bookingDate).toLocaleDateString('en-GB');
+  const method = booking.payment.method === 'cash' ? 'Cash' : (booking.payment.method === 'hubtel' ? 'Hubtel' : '—');
+%>
+<div class="sheet">
+  <div class="row">
+    <div>
+      <div class="brand"><%= cfg.businessInfo.name %></div>
+      <div class="brand-sub">WATER TANK CLEANING &amp; DISINFECTION</div>
+    </div>
+    <div class="rcpt">
+      <div>Receipt <strong><%= booking.receiptNumber %></strong></div>
+      <div>Date: <strong><%= new Date().toLocaleDateString('en-GB') %></strong></div>
+      <div>Service date: <%= dateSvc %></div>
+    </div>
+  </div>
+
+  <h2>Receipt</h2>
+  <div>Billed to: <strong><%= booking.clientName %></strong> &middot; <%= booking.whatsapp %></div>
+  <div class="text-muted"><%= booking.location.address || '' %></div>
+
+  <table style="margin-top:14px">
+    <thead>
+      <tr><th>Item</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+      <% booking.tanks.forEach(t => { %>
+        <tr>
+          <td><%= t.label %> (<%= booking.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard' %>)</td>
+          <td class="num"><%= t.quantity %></td>
+          <td class="num"><%= money(t.unitPrice) %></td>
+          <td class="num"><%= money(t.lineTotal) %></td>
+        </tr>
+      <% }) %>
+      <% if (!booking.transport.free) { %>
+        <tr><td>Transport (<%= booking.transport.extraKm %> km beyond free radius)</td><td class="num"></td><td class="num"></td><td class="num"><%= money(booking.transport.fee) %></td></tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="line"><span>Tanks subtotal</span><span><%= money(booking.pricing.tanksSubtotal) %></span></div>
+    <div class="line"><span>Transport</span><span><%= booking.transport.free ? 'Free' : money(booking.transport.fee) %></span></div>
+    <div class="line grand"><span>Total</span><span><%= money(booking.pricing.total) %></span></div>
+    <div class="line paid"><span>Paid (<%= method %>)</span><span><%= money(booking.payment.amountPaid) %></span></div>
+    <% if (booking.payment.amountDue > 0) { %>
+      <div class="line due"><span>Balance due</span><span><%= money(booking.payment.amountDue) %></span></div>
+    <% } %>
+  </div>
+
+  <div class="qr">
+    <% if (qr) { %><img src="<%= qr %>" alt="Re-book QR" /><div style="font-size:10px;color:var(--blue)">Scan to re-book</div><% } %>
+  </div>
+
+  <div class="foot">
+    Thank you for choosing <%= cfg.businessInfo.name %>.<br />
+    <%= cfg.businessInfo.subsidiaryOf %> &middot; <%= cfg.businessInfo.phone %>
+  </div>
+</div>
+</body>
+</html>
