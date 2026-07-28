@@ -29,7 +29,7 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Preferred service date</label>
-              <input name="bookingDate" type="date" class="form-control" required />
+              <input name="bookingDate" type="date" class="form-control" min="<%= new Date().toISOString().slice(0,10) %>" required />
             </div>
           </div>
 

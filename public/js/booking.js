@@ -141,18 +141,27 @@
       transportEl.innerHTML = `<span class="badge badge-fee">${money(q.transportFee)}</span>`;
       distNote.textContent = `(${q.distanceKm} km, ${q.extraKm} km out)`;
     }
-    document.getElementById('sumTotal').textContent = money(q.total);
+    const isCustom = q.hasCustom && q.hasCustom.length;
+    const sumTotalEl = document.getElementById('sumTotal');
+    sumTotalEl.textContent = isCustom ? 'A custom quote is required' : money(q.total);
+    sumTotalEl.classList.toggle('total-custom', !!isCustom);
 
-    // Custom-priced sizes → note that final price is confirmed manually.
+    // Custom-priced sizes → total isn't settled; pay-now is locked off.
     const customNote = document.getElementById('customNote');
-    if (q.hasCustom && q.hasCustom.length) {
-      customNote.textContent = 'Some tank sizes are custom-quoted; we will confirm the final price.';
-      customNote.classList.remove('d-none');
-    } else customNote.classList.add('d-none');
-
-    // Pay-now rule: outside radius forces the transport fee as a commitment.
     const payNote = document.getElementById('payNote');
     const paySelect = document.getElementById('payNowChoice');
+    if (isCustom) {
+      customNote.textContent = 'You will receive a call soon to scope out the total cost of the service.';
+      customNote.classList.remove('d-none');
+      paySelect.value = 'later';
+      paySelect.disabled = true;
+      payNote.classList.add('d-none');
+      return;
+    }
+    customNote.classList.add('d-none');
+    paySelect.disabled = false;
+
+    // Pay-now rule: outside radius forces the transport fee as a commitment.
     if (q.payNowRequired) {
       paySelect.value = 'now';
       payNote.textContent = `You're outside our free radius — the transport fee of ${money(q.transportFee)} is required now as a commitment. The rest is paid on-site.`;
@@ -166,6 +175,11 @@
   document.getElementById('bookingForm').addEventListener('submit', (e) => {
     const tanks = collectTanks();
     if (!tanks.length) { e.preventDefault(); alert('Please add at least one tank.'); return; }
+    if (!document.getElementById('lat').value || !document.getElementById('lng').value) {
+      e.preventDefault();
+      alert('Please pick your service location on the map.');
+      return;
+    }
     document.getElementById('tanksInput').value = JSON.stringify(tanks);
   });
 

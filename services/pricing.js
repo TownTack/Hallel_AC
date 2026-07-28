@@ -41,6 +41,7 @@ async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, se
       quantity: qty,
       unitPrice: price,
       lineTotal,
+      custom: !!item.custom,
     });
   }
 

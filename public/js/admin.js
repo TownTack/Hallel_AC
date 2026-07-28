@@ -42,6 +42,14 @@
       const out = await patch(`/admin/bookings/${id}/certificate`, data);
       if (out.ok) alert('Certificate details saved.');
     });
+
+    const settleForm = content.querySelector('.js-settle');
+    if (settleForm) settleForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(settleForm).entries());
+      const out = await patch(`/admin/bookings/${id}/settle-quote`, data);
+      if (out.ok) refreshAfterAction(id);
+    });
   }
 
   async function refreshAfterAction(id) {

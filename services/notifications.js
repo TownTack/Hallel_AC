@@ -65,9 +65,12 @@ async function sendBookingConfirmation(booking, settings) {
   if (settings && settings.notificationsEnabled === false) return { ok: false, reason: 'disabled' };
   const { date } = bookingSummaryLine(booking);
   const ref = String(booking._id).slice(-6).toUpperCase();
+  const totalLine = booking.pricing.customPending
+    ? 'You will receive a call soon to scope out the total cost of the service.'
+    : `Total ${money(booking.pricing.total)}.`;
   const msg =
     `Hallel AquaCare: booking received (ref ${ref}) for ${date}. ` +
-    `Total ${money(booking.pricing.total)}. We'll be in touch. Thank you!`;
+    `${totalLine} We'll be in touch. Thank you!`;
   return sendSms(booking.whatsapp, msg, settings);
 }
 
@@ -80,9 +83,12 @@ async function notifyAdmin(booking, settings) {
     return { ok: false, reason: 'no-admin-number' };
   }
   const { tanks, date } = bookingSummaryLine(booking);
+  const totalLine = booking.pricing.customPending
+    ? 'Custom quote — call client to scope the total cost.'
+    : `Total ${money(booking.pricing.total)}.`;
   const msg =
     `New booking: ${booking.clientName} (${booking.whatsapp}) on ${date}. ` +
-    `${tanks}. Total ${money(booking.pricing.total)}.`;
+    `${tanks}. ${totalLine}`;
   return sendSms(to, msg, settings);
 }
 

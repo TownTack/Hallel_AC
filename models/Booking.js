@@ -7,6 +7,7 @@ const tankLineSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true },
   lineTotal: { type: Number, required: true },
+  custom: { type: Boolean, default: false },
 }, { _id: false });
 
 const addOnSchema = new mongoose.Schema({
@@ -48,6 +49,9 @@ const bookingSchema = new mongoose.Schema({
     minCalloutApplied: { type: Boolean, default: false },
     transportFee: Number,
     total: Number,
+    // True while a custom-priced tank hasn't been settled by the admin yet.
+    // While true, the total is not final — displays show a "call to scope" message.
+    customPending: { type: Boolean, default: false },
   },
 
   // ---- Payment ----

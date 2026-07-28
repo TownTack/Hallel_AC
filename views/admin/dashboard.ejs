@@ -58,7 +58,8 @@
         </div>
         <div class="mt-2">
           <% if (b.jobCompleted) { %><span class="badge bg-success">Job done</span><% } else { %><span class="badge bg-secondary">Job pending</span><% } %>
-          <% if (!b.transport.free) { %><span class="badge badge-fee">Transport GHS <%= b.transport.fee.toFixed(2) %></span><% } %>
+          <% if (st === 'paid') { %><span class="badge bg-success">Paid</span><% } %>
+          <% if (!b.transport.free && st === 'unpaid') { %><span class="badge badge-fee">Transport GHS <%= b.transport.fee.toFixed(2) %></span><% } %>
         </div>
       </div>
     </div>

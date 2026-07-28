@@ -37,8 +37,9 @@
       <div class="col-md-3">
         <label class="form-label">Distance provider</label>
         <select name="distanceProvider" class="form-select">
-          <option value="haversine" <%= cfg.distanceProvider === 'haversine' ? 'selected' : '' %>>Haversine (free)</option>
-          <option value="google" <%= cfg.distanceProvider === 'google' ? 'selected' : '' %>>Google (driving)</option>
+          <option value="haversine" <%= cfg.distanceProvider === 'haversine' ? 'selected' : '' %>>Haversine (straight-line, free)</option>
+          <option value="osrm" <%= cfg.distanceProvider === 'osrm' ? 'selected' : '' %>>OSRM (driving, free)</option>
+          <option value="google" <%= cfg.distanceProvider === 'google' ? 'selected' : '' %>>Google (driving, API key)</option>
         </select>
       </div>
     </div>
@@ -88,3 +89,26 @@
 
   <button class="btn btn-primary" type="submit">Save settings</button>
 </form>
+
+<!-- Account: change my password -->
+<div class="card booking-card p-4 mb-4">
+  <h5 class="section-title mb-3">Account</h5>
+  <form action="/admin/account/password" method="POST" class="row g-3" autocomplete="off">
+    <div class="col-md-4">
+      <label class="form-label">Current password</label>
+      <input name="currentPassword" type="password" class="form-control" autocomplete="current-password" required />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">New password</label>
+      <input name="newPassword" type="password" class="form-control" minlength="10" autocomplete="new-password" required />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Confirm new password</label>
+      <input name="confirmPassword" type="password" class="form-control" minlength="10" autocomplete="new-password" required />
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Change password</button>
+      <span class="small text-muted ms-2">Use a strong, unique password (10+ characters).</span>
+    </div>
+  </form>
+</div>

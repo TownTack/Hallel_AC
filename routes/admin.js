@@ -3,8 +3,10 @@ const router = express.Router();
 
 const Booking = require('../models/Booking');
 const Settings = require('../models/Settings');
+const User = require('../models/User');
 const { requireAdmin } = require('../middleware/auth');
 const { ensureCertificateNumber, ensureReceiptNumber, rebookQrDataUrl } = require('../services/documents');
+const { round2 } = require('../services/pricing');
 
 // Everything under /admin requires a logged-in admin.
 router.use(requireAdmin);
@@ -47,7 +49,21 @@ router.patch('/bookings/:id/payment', async (req, res, next) => {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ ok: false });
 
-    const { mode } = req.body; // 'full' | 'deposit'
+    const { mode } = req.body; // 'full' | 'deposit' | 'reset'
+
+    if (mode === 'reset') {
+      // Undo a confirmation — restore the unpaid state (and the transport tag).
+      booking.payment.status = 'unpaid';
+      booking.payment.amountPaid = 0;
+      booking.payment.amountDue = booking.pricing.total;
+      booking.payment.method = booking.payment.payNowChoice === 'now' ? 'hubtel' : 'none';
+      booking.payment.confirmedManually = false;
+      booking.payment.confirmedBy = undefined;
+      booking.payment.confirmedAt = undefined;
+      await booking.save();
+      return res.json({ ok: true, status: booking.payment.status });
+    }
+
     booking.payment.method = booking.payment.method === 'hubtel' ? 'hubtel' : 'cash';
     booking.payment.confirmedManually = true;
     booking.payment.confirmedBy = req.session.user.name;
@@ -76,6 +92,41 @@ router.patch('/bookings/:id/job', async (req, res, next) => {
     booking.jobStatus = booking.jobCompleted ? 'completed' : 'pending';
     await booking.save();
     res.json({ ok: true, jobCompleted: booking.jobCompleted });
+  } catch (err) { next(err); }
+});
+
+// ---- Settle a custom quote (admin enters agreed prices, total recomputes) ----
+router.patch('/bookings/:id/settle-quote', async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ ok: false });
+    if (!booking.tanks.some((t) => t.custom)) return res.status(400).json({ ok: false, error: 'No custom tank to price.' });
+
+    const settings = await Settings.get();
+
+    // Apply the entered unit price to each custom tank line.
+    booking.tanks.forEach((t, i) => {
+      if (!t.custom) return;
+      const price = parseFloat(req.body[`price_${i}`]);
+      if (!Number.isFinite(price) || price < 0) return;
+      t.unitPrice = price;
+      t.lineTotal = round2(price * t.quantity);
+    });
+
+    // Recompute exactly as computeQuote does: subtotal → min call-out floor → + transport.
+    const tanksSubtotal = round2(booking.tanks.reduce((s, t) => s + (t.lineTotal || 0), 0));
+    const minCalloutApplied = tanksSubtotal > 0 && tanksSubtotal < settings.minCallOutFee;
+    const jobSubtotal = minCalloutApplied ? settings.minCallOutFee : tanksSubtotal;
+    const total = round2(jobSubtotal + booking.transport.fee);
+
+    booking.pricing.tanksSubtotal = tanksSubtotal;
+    booking.pricing.minCalloutApplied = minCalloutApplied;
+    booking.pricing.total = total;
+    booking.pricing.customPending = false;
+    booking.payment.amountDue = round2(total - booking.payment.amountPaid);
+
+    await booking.save();
+    res.json({ ok: true, total });
   } catch (err) { next(err); }
 });
 
@@ -120,6 +171,38 @@ router.get('/bookings/:id/receipt', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---- Change my password ----
+router.post('/account/password', async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const user = await User.findById(req.session.user.id);
+    if (!user) {
+      req.flash('error', 'Your session has expired. Please log in again.');
+      return res.redirect('/admin/login');
+    }
+    if (!(await user.verifyPassword(currentPassword || ''))) {
+      req.flash('error', 'Current password is incorrect.');
+      return res.redirect('/admin/settings');
+    }
+    if (!newPassword || newPassword.length < 10) {
+      req.flash('error', 'New password must be at least 10 characters.');
+      return res.redirect('/admin/settings');
+    }
+    if (newPassword !== confirmPassword) {
+      req.flash('error', 'New password and confirmation do not match.');
+      return res.redirect('/admin/settings');
+    }
+    if (newPassword === currentPassword) {
+      req.flash('error', 'New password must be different from the current one.');
+      return res.redirect('/admin/settings');
+    }
+    user.passwordHash = await User.hashPassword(newPassword);
+    await user.save();
+    req.flash('success', 'Password changed successfully.');
+    res.redirect('/admin/settings');
+  } catch (err) { next(err); }
+});
+
 // ---- Settings ----
 router.get('/settings', async (req, res, next) => {
   try {
@@ -146,7 +229,7 @@ router.post('/settings', async (req, res, next) => {
     settings.freeRadiusKm = num(b.freeRadiusKm, settings.freeRadiusKm);
     settings.transportRatePerKm = num(b.transportRatePerKm, settings.transportRatePerKm);
     settings.minCallOutFee = num(b.minCallOutFee, settings.minCallOutFee);
-    settings.distanceProvider = b.distanceProvider === 'google' ? 'google' : 'haversine';
+    settings.distanceProvider = ['google', 'osrm'].includes(b.distanceProvider) ? b.distanceProvider : 'haversine';
     settings.adminNotifyNumber = b.adminNotifyNumber || '';
     settings.notificationsEnabled = b.notificationsEnabled === 'on';
 

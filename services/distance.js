@@ -38,11 +38,31 @@ async function googleDistanceKm(base, dest) {
   return haversine(base, dest);
 }
 
+// Real driving distance via the public OSRM router — no API key, no cost.
+// Falls back to haversine on any error/timeout so fee calculation never breaks.
+async function osrmDistanceKm(base, dest) {
+  try {
+    // OSRM expects lng,lat order.
+    const url = `https://router.project-osrm.org/route/v1/driving/` +
+      `${base.lng},${base.lat};${dest.lng},${dest.lat}`;
+    const { data } = await axios.get(url, {
+      params: { overview: 'false' },
+      timeout: 8000,
+    });
+    const meters = data?.routes?.[0]?.distance;
+    if (typeof meters === 'number') return meters / 1000;
+  } catch (err) {
+    console.warn('[distance] osrm lookup failed, using haversine:', err.message);
+  }
+  return haversine(base, dest);
+}
+
 // Pluggable entry point. `provider` comes from Settings (DB), so it can be
-// switched to 'google' from the admin panel without a code change.
+// switched from the admin panel without a code change.
 async function getDistanceKm(base, dest, provider = 'haversine') {
   if (!base || !dest || dest.lat == null || dest.lng == null) return 0;
   if (provider === 'google') return googleDistanceKm(base, dest);
+  if (provider === 'osrm') return osrmDistanceKm(base, dest);
   return haversine(base, dest);
 }
 

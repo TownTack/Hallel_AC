@@ -6,7 +6,19 @@ const bookingRules = [
     .matches(/^[+0-9][0-9\s()-]{6,}$/).withMessage('Enter a valid phone number.'),
   body('email').optional({ checkFalsy: true }).isEmail().withMessage('Enter a valid email.').normalizeEmail(),
   body('serviceTier').isIn(['standard', 'preserve']).withMessage('Choose a service tier.'),
-  body('bookingDate').notEmpty().withMessage('Pick a service date.').isISO8601().withMessage('Invalid date.'),
+  body('bookingDate').notEmpty().withMessage('Pick a service date.').isISO8601().withMessage('Invalid date.')
+    .custom((v) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(v) < today) throw new Error("Service date can't be in the past.");
+      return true;
+    }),
+  body('lat').custom((v, { req }) => {
+    if (!Number.isFinite(parseFloat(v)) || !Number.isFinite(parseFloat(req.body.lng))) {
+      throw new Error('Please pick your service location on the map.');
+    }
+    return true;
+  }),
   body('tanks').custom((v) => {
     const arr = typeof v === 'string' ? JSON.parse(v) : v;
     if (!Array.isArray(arr) || arr.length === 0) throw new Error('Add at least one tank.');

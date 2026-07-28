@@ -74,9 +74,17 @@ router.post('/booking', bookingLimiter, bookingRules, async (req, res, next) => 
       return res.redirect('/');
     }
 
-    const payNowChoice = req.body.payNowChoice === 'now' ? 'now' : 'later';
+    // A custom-priced tank means the total isn't settled yet — no online payment
+    // is possible until the admin phones the client and settles the price.
+    const customPending = quote.hasCustom.length > 0;
+
+    let payNowChoice = req.body.payNowChoice === 'now' ? 'now' : 'later';
     // Outside radius forces the transport fee as a commitment deposit.
-    const mustPayNow = quote.payNowRequired;
+    let mustPayNow = quote.payNowRequired;
+    if (customPending) {
+      payNowChoice = 'later';
+      mustPayNow = false;
+    }
     const effectivePayNow = mustPayNow || payNowChoice === 'now';
 
     // Determine amounts for the payment record.
@@ -111,6 +119,7 @@ router.post('/booking', bookingLimiter, bookingRules, async (req, res, next) => 
         minCalloutApplied: quote.minCalloutApplied,
         transportFee: quote.transportFee,
         total: quote.total,
+        customPending,
       },
       payment: {
         method: effectivePayNow ? 'hubtel' : 'none',

@@ -39,7 +39,7 @@ const settingsSchema = new mongoose.Schema({
   minCallOutFee: { type: Number, default: 150 },
   quarterlyDiscountPct: { type: Number, default: 15 }, // future recurring
 
-  distanceProvider: { type: String, enum: ['haversine', 'google'], default: 'haversine' },
+  distanceProvider: { type: String, enum: ['haversine', 'google', 'osrm'], default: 'haversine' },
 
   priceList: { type: [priceItemSchema], default: DEFAULT_PRICE_LIST },
 
