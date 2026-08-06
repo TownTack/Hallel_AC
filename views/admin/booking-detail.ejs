@@ -5,6 +5,7 @@
 <div class="modal-header">
   <h5 class="modal-title"><%= booking.clientName %>
     <span class="badge <%= badge %> ms-2"><%= st.replace('_',' ') %></span>
+    <small class="text-muted ms-2">Ref <%= booking.reference || String(booking._id).slice(-6).toUpperCase() %></small>
   </h5>
   <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
@@ -33,21 +34,34 @@
 
   <hr />
   <% const isHubtel = booking.payment.method === 'hubtel'; %>
+  <% const hubtelPaid = !!(booking.payment.hubtel && booking.payment.hubtel.transactionId); %>
   <div class="row small">
     <div class="col-6">Payment method</div><div class="col-6 text-end"><%= isHubtel ? 'Hubtel (online)' : 'Cash / pay on-site' %></div>
     <div class="col-6">Tanks subtotal</div><div class="col-6 text-end">GHS <%= booking.pricing.tanksSubtotal.toFixed(2) %></div>
     <div class="col-6">Transport</div><div class="col-6 text-end"><%= booking.transport.free ? 'Free' : 'GHS ' + booking.transport.fee.toFixed(2) %></div>
     <div class="col-6 fw-bold">Total</div>
     <div class="col-6 text-end fw-bold"><%= booking.pricing.customPending ? 'Custom quote required' : 'GHS ' + booking.pricing.total.toFixed(2) %></div>
-    <% if (booking.payment.confirmedManually) { %>
-      <div class="col-6 text-muted">Paid</div><div class="col-6 text-end text-muted">GHS <%= booking.payment.amountPaid.toFixed(2) %> (due GHS <%= booking.payment.amountDue.toFixed(2) %>)</div>
-      <div class="col-12 text-muted mt-1">Confirmed by <%= booking.payment.confirmedBy %> on <%= new Date(booking.payment.confirmedAt).toLocaleString('en-GB') %></div>
-    <% } else if (isHubtel) { %>
-      <div class="col-6 text-muted">Paid</div><div class="col-6 text-end text-muted">GHS <%= booking.payment.amountPaid.toFixed(2) %></div>
-      <div class="col-12 text-muted mt-1">Payment received from Hubtel — awaiting admin's final confirmation.</div>
+
+    <% if (booking.payment.status !== 'unpaid') { %>
+      <div class="col-6 text-muted mt-1">Paid</div>
+      <div class="col-6 text-end text-muted mt-1">GHS <%= booking.payment.amountPaid.toFixed(2) %> (due GHS <%= booking.payment.amountDue.toFixed(2) %>)</div>
+      <% if (hubtelPaid) { %>
+        <div class="col-12 text-muted">Received from Hubtel (txn <%= booking.payment.hubtel.transactionId %>).</div>
+      <% } %>
+      <div class="col-6 fw-bold mt-1">Confirmed</div>
+      <div class="col-6 text-end mt-1">
+        <span class="badge <%= booking.payment.confirmedManually ? 'bg-success' : 'bg-secondary' %>"><%= booking.payment.confirmedManually ? 'Yes' : 'No' %></span>
+      </div>
+      <% if (booking.payment.confirmedManually) { %>
+        <div class="col-12 text-muted">Confirmed by <%= booking.payment.confirmedBy %> on <%= new Date(booking.payment.confirmedAt).toLocaleString('en-GB') %></div>
+      <% } else if (hubtelPaid) { %>
+        <div class="col-12 text-muted">Paid via Hubtel — check your phone, then confirm to finalise.</div>
+      <% } else { %>
+        <div class="col-12 text-muted">Awaiting your confirmation.</div>
+      <% } %>
     <% } else { %>
-      <div class="col-6 text-muted">Paid</div><div class="col-6 text-end text-muted">GHS 0.00</div>
-      <div class="col-12 text-muted mt-1">Awaiting cash payment confirmation by admin.</div>
+      <div class="col-6 text-muted mt-1">Paid</div><div class="col-6 text-end text-muted mt-1">GHS 0.00</div>
+      <div class="col-12 text-muted"><%= isHubtel ? 'Awaiting Hubtel payment.' : 'Awaiting cash payment confirmation by admin.' %></div>
     <% } %>
   </div>
 
@@ -55,7 +69,14 @@
   <!-- Actions -->
   <div class="d-flex flex-wrap gap-2 mb-3">
     <% if (!booking.pricing.customPending) { %>
-      <% if (booking.payment.status === 'unpaid') { %>
+      <% if (hubtelPaid) { %>
+        <%# Money already received via Hubtel — admin only double-checks it. %>
+        <% if (!booking.payment.confirmedManually) { %>
+          <button class="btn btn-sm btn-success js-pay" data-mode="confirm">Confirm payment</button>
+        <% } else { %>
+          <button class="btn btn-sm btn-outline-danger js-pay" data-mode="unconfirm">Undo confirmation</button>
+        <% } %>
+      <% } else if (booking.payment.status === 'unpaid') { %>
         <button class="btn btn-sm btn-success js-pay" data-mode="full">Confirm full payment</button>
         <% if (!booking.transport.free) { %>
           <button class="btn btn-sm btn-outline-warning js-pay" data-mode="deposit">Confirm deposit only</button>

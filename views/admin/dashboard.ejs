@@ -15,7 +15,7 @@
 
 <!-- Filters -->
 <form class="row g-2 mb-4" method="GET">
-  <div class="col-md-3"><input class="form-control form-control-sm" name="q" placeholder="Search name…" value="<%= query.q || '' %>" /></div>
+  <div class="col-md-3"><input class="form-control form-control-sm" name="q" placeholder="Search name or ref…" value="<%= query.q || '' %>" /></div>
   <div class="col-md-3">
     <select class="form-select form-select-sm" name="status">
       <option value="">All payment statuses</option>
@@ -49,6 +49,7 @@
           <div>
             <div class="fw-bold"><%= b.clientName %></div>
             <div class="small text-muted"><%= b.whatsapp %></div>
+            <div class="small text-muted">Ref <%= b.reference || String(b._id).slice(-6).toUpperCase() %></div>
           </div>
           <span class="status-dot <%= dot %>" title="<%= st %>"></span>
         </div>

@@ -64,7 +64,9 @@ const bookingSchema = new mongoose.Schema({
     hubtel: {
       reference: String,
       transactionId: String,
+      checkoutId: String,
       checkoutUrl: String,
+      amount: Number, // amount we asked Hubtel to collect (deposit or full)
       raw: mongoose.Schema.Types.Mixed,
     },
     confirmedManually: { type: Boolean, default: false },
@@ -93,7 +95,15 @@ const bookingSchema = new mongoose.Schema({
     interval: { type: String, enum: ['once', 'quarterly'], default: 'once' },
   },
 
+  // Short human-facing code (last 6 of _id, uppercased) — quoted in the client
+  // SMS and searchable in the admin dashboard. Set once via the pre-save hook.
+  reference: { type: String, index: true },
+
   notes: String,
 }, { timestamps: true });
+
+bookingSchema.pre('save', function () {
+  if (!this.reference) this.reference = String(this._id).slice(-6).toUpperCase();
+});
 
 module.exports = mongoose.model('Booking', bookingSchema, 'Bookings');

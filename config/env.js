@@ -19,10 +19,11 @@ const env = {
   },
 
   hubtel: {
+    // Online Checkout (payments). Return/callback/cancellation URLs are built
+    // from baseUrl at call time (see services/hubtel.js + routes/public.js).
     clientId: process.env.HUBTEL_CLIENT_ID || '',
     clientSecret: process.env.HUBTEL_CLIENT_SECRET || '',
-    merchantAccount: process.env.HUBTEL_MERCHANT_ACCOUNT || '',
-    callbackUrl: process.env.HUBTEL_CALLBACK_URL || '',
+    merchantAccount: process.env.HUBTEL_MERCHANT_ACCOUNT || '', // Collection Account Number
   },
 
   sms: {

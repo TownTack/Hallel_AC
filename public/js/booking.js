@@ -17,17 +17,33 @@
   L.circle([base.lat, base.lng], { radius: cfg.freeRadiusKm * 1000, color: '#1b9dd9', weight: 1, fillOpacity: 0.05 }).addTo(map);
   L.marker([base.lat, base.lng], { title: base.name || 'Base' }).addTo(map).bindPopup('Our base');
 
+  // Look up a human-readable address for a dropped/dragged pin (Nominatim reverse).
+  async function reverseGeocode(lat, lng) {
+    try {
+      const url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+      const data = await res.json();
+      return data && data.display_name ? data.display_name : '';
+    } catch (_) { return ''; }
+  }
+
   let clientMarker = null;
   function setClient(lat, lng, label) {
     document.getElementById('lat').value = lat;
     document.getElementById('lng').value = lng;
-    if (label) document.getElementById('address').value = label;
+    if (label) {
+      document.getElementById('address').value = label;
+    } else {
+      // No label (map click / my-location) — resolve the address from the pin.
+      reverseGeocode(lat, lng).then((name) => { if (name) document.getElementById('address').value = name; });
+    }
     if (!clientMarker) {
       clientMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
       clientMarker.on('dragend', () => {
         const p = clientMarker.getLatLng();
         document.getElementById('lat').value = p.lat;
         document.getElementById('lng').value = p.lng;
+        reverseGeocode(p.lat, p.lng).then((name) => { if (name) document.getElementById('address').value = name; });
         refreshQuote();
       });
     } else {
@@ -42,7 +58,7 @@
   document.getElementById('myLocationBtn').addEventListener('click', () => {
     if (!navigator.geolocation) return alert('Geolocation not supported.');
     navigator.geolocation.getCurrentPosition(
-      (pos) => setClient(pos.coords.latitude, pos.coords.longitude, 'My current location'),
+      (pos) => setClient(pos.coords.latitude, pos.coords.longitude),
       () => alert('Could not get your location. Please drop the pin manually.')
     );
   });

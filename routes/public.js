@@ -4,8 +4,9 @@ const router = express.Router();
 
 const Settings = require('../models/Settings');
 const Booking = require('../models/Booking');
-const { computeQuote } = require('../services/pricing');
+const { computeQuote, round2 } = require('../services/pricing');
 const { dispatchBookingNotifications } = require('../services/notifications');
+const hubtel = require('../services/hubtel');
 const { bookingRules, collect } = require('../middleware/validators');
 const env = require('../config/env');
 
@@ -130,16 +131,41 @@ router.post('/booking', bookingLimiter, bookingRules, async (req, res, next) => 
       },
     });
 
-    // Notify client + admin (fire-and-forget; never blocks).
-    dispatchBookingNotifications(booking, settings);
-
-    // TODO(payment): when Hubtel docs land, if effectivePayNow → create checkout
-    // for `amountToPayNow` and redirect to the checkout URL. For now we record the
-    // intent and proceed to the success page (cash / pay-on-site works fully).
+    // Online payment: create a Hubtel checkout and redirect the browser to the
+    // hosted page. clientReference = booking._id (24-char ObjectId, within Hubtel's
+    // 32-char limit) so the callback / status check / cancel resolve via findById.
     if (effectivePayNow) {
-      req.flash('success', `Booking received. Please pay ${amountToPayNow.toFixed(2)} GHS to confirm (online payment coming soon).`);
+      const ref = booking._id.toString();
+      const result = await hubtel.createCheckout({
+        amount: amountToPayNow,
+        description: `Hallel AquaCare booking ${ref}`,
+        clientReference: ref,
+        returnUrl: `${env.baseUrl}/booking/success/${ref}`,
+        cancellationUrl: `${env.baseUrl}/payment/cancel/${ref}`,
+        callbackUrl: `${env.baseUrl}/payment/webhook`,
+        payee: { name: booking.clientName, mobile: booking.whatsapp, email: booking.email },
+      });
+
+      if (result.ok) {
+        booking.payment.hubtel.reference = ref;
+        booking.payment.hubtel.checkoutId = result.checkoutId;
+        booking.payment.hubtel.checkoutUrl = result.checkoutUrl;
+        booking.payment.hubtel.amount = round2(amountToPayNow);
+        await booking.save();
+        // NOTE: notifications are deferred to the payment callback
+        // (routes/payment.js), so a cancelled booking never notifies anyone.
+        return res.redirect(result.checkoutUrl); // leave site → Hubtel hosted page
+      }
+
+      // Dry-run (creds unset) or API failure: no online payment will happen, so
+      // treat like a normal booking — notify now and show the success page.
+      dispatchBookingNotifications(booking, settings);
+      req.flash('success', `Booking received. Please pay ${amountToPayNow.toFixed(2)} GHS to confirm.`);
+      return res.redirect(`/booking/success/${booking._id}`);
     }
 
+    // Cash / pay-later: notify immediately (no online payment step).
+    dispatchBookingNotifications(booking, settings);
     return res.redirect(`/booking/success/${booking._id}`);
   } catch (err) {
     next(err);

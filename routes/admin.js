@@ -19,7 +19,10 @@ router.get('/', async (req, res, next) => {
     if (status) filter['payment.status'] = status;
     if (job === 'completed') filter.jobCompleted = true;
     if (job === 'pending') filter.jobCompleted = false;
-    if (q) filter.clientName = new RegExp(q, 'i');
+    if (q) {
+      const rx = new RegExp(q.trim(), 'i');
+      filter.$or = [{ clientName: rx }, { reference: rx }];
+    }
 
     const bookings = await Booking.find(filter).sort({ createdAt: -1 }).limit(200);
 
@@ -43,14 +46,40 @@ router.get('/bookings/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---- Manual payment confirmation (e.g. cash on site) ----
+// ---- Payment confirmation ----
+// Two flavours, keyed off whether Hubtel already settled the payment:
+//  * Hubtel payment (money received via the callback, transactionId present):
+//    admin confirmation is ONLY a human double-check. We flip confirmedManually
+//    and KEEP the amount Hubtel reported — we never recompute from pricing.total.
+//  * Cash / pay-on-site (no Hubtel transaction): admin confirms the amount by
+//    hand (full or deposit), or resets back to unpaid.
 router.patch('/bookings/:id/payment', async (req, res, next) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ ok: false });
 
-    const { mode } = req.body; // 'full' | 'deposit' | 'reset'
+    const { mode } = req.body; // 'confirm' | 'unconfirm' | 'full' | 'deposit' | 'reset'
+    const hubtelPaid = !!(booking.payment.hubtel && booking.payment.hubtel.transactionId);
 
+    // Hubtel-settled: confirm just stamps the double-check; amount stays as paid.
+    // (The `hubtelPaid && full/reset` guards defend against a stale fragment
+    // posting the cash-flow modes on a Hubtel booking — never wipe the amount.)
+    if (mode === 'confirm' || (hubtelPaid && mode === 'full')) {
+      booking.payment.confirmedManually = true;
+      booking.payment.confirmedBy = req.session.user.name;
+      booking.payment.confirmedAt = new Date();
+      await booking.save();
+      return res.json({ ok: true, status: booking.payment.status });
+    }
+    if (mode === 'unconfirm' || (hubtelPaid && mode === 'reset')) {
+      booking.payment.confirmedManually = false;
+      booking.payment.confirmedBy = undefined;
+      booking.payment.confirmedAt = undefined;
+      await booking.save();
+      return res.json({ ok: true, status: booking.payment.status });
+    }
+
+    // ---- Cash / pay-on-site ----
     if (mode === 'reset') {
       // Undo a confirmation — restore the unpaid state (and the transport tag).
       booking.payment.status = 'unpaid';

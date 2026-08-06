@@ -14,6 +14,10 @@ const User = require('./models/User');
 
 const app = express();
 
+// Behind a reverse proxy / tunnel (cloudflared, and any prod reverse proxy) so
+// req.ip, secure-cookie detection and express-rate-limit read X-Forwarded-For.
+app.set('trust proxy', 1);
+
 // ---- View engine (ejs-mate for layouts) ----
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
@@ -30,6 +34,9 @@ app.use(
         imgSrc: ["'self'", 'data:', 'https://*.tile.openstreetmap.org', 'https://unpkg.com'],
         connectSrc: ["'self'", 'https://nominatim.openstreetmap.org'],
         fontSrc: ["'self'", 'https://cdn.jsdelivr.net', 'data:'],
+        // Allow the booking form's POST to redirect out to Hubtel's hosted
+        // checkout (Chrome enforces form-action against the redirect target).
+        formAction: ["'self'", 'https://pay.hubtel.com'],
       },
     },
     crossOriginEmbedderPolicy: false,

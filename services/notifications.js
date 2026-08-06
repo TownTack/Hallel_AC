@@ -29,21 +29,19 @@ async function sendSms(to, message, settings) {
   }
 
   try {
-    // Hubtel Quick SMS endpoint (GET with basic auth via query is the documented
-    // simple form; adjust when the official docs are provided).
-    const res = await axios.get('https://smsc.hubtel.com/v1/messages/send', {
-      params: {
-        clientid: env.sms.clientId,
-        clientsecret: env.sms.clientSecret,
-        from: (settings?.businessInfo?.name && env.sms.senderId) || env.sms.senderId,
-        to: dest,
-        content: message,
-      },
-      timeout: 8000,
-    });
-    return { ok: true, data: res.data };
+    // Hubtel Simple SEND SMS (POST + Basic auth + JSON) per the official docs.
+    const auth = Buffer.from(`${env.sms.clientId}:${env.sms.clientSecret}`).toString('base64');
+    const res = await axios.post(
+      'https://sms.hubtel.com/v1/messages/send',
+      { From: env.sms.senderId, To: dest, Content: message },
+      { headers: { 'Content-Type': 'application/json', Authorization: `Basic ${auth}` }, timeout: 8000 }
+    );
+    // status 0 = "request submitted successfully"
+    const ok = res.data?.status === 0 || res.status === 201;
+    if (!ok) console.error(`[sms] non-success to ${dest}:`, res.data?.status, res.data?.statusDescription);
+    return { ok, data: res.data };
   } catch (err) {
-    console.error(`[sms] failed to ${dest}:`, err.message);
+    console.error(`[sms] failed to ${dest}:`, err.response?.data || err.message);
     return { ok: false, reason: err.message };
   }
 }
@@ -64,7 +62,7 @@ function bookingSummaryLine(booking) {
 async function sendBookingConfirmation(booking, settings) {
   if (settings && settings.notificationsEnabled === false) return { ok: false, reason: 'disabled' };
   const { date } = bookingSummaryLine(booking);
-  const ref = String(booking._id).slice(-6).toUpperCase();
+  const ref = booking.reference || String(booking._id).slice(-6).toUpperCase();
   const totalLine = booking.pricing.customPending
     ? 'You will receive a call soon to scope out the total cost of the service.'
     : `Total ${money(booking.pricing.total)}.`;
