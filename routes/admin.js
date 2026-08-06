@@ -61,20 +61,41 @@ router.patch('/bookings/:id/payment', async (req, res, next) => {
     const { mode } = req.body; // 'confirm' | 'unconfirm' | 'full' | 'deposit' | 'reset'
     const hubtelPaid = !!(booking.payment.hubtel && booking.payment.hubtel.transactionId);
 
-    // Hubtel-settled: confirm just stamps the double-check; amount stays as paid.
-    // (The `hubtelPaid && full/reset` guards defend against a stale fragment
-    // posting the cash-flow modes on a Hubtel booking — never wipe the amount.)
-    if (mode === 'confirm' || (hubtelPaid && mode === 'full')) {
-      booking.payment.confirmedManually = true;
-      booking.payment.confirmedBy = req.session.user.name;
-      booking.payment.confirmedAt = new Date();
-      await booking.save();
-      return res.json({ ok: true, status: booking.payment.status });
-    }
-    if (mode === 'unconfirm' || (hubtelPaid && mode === 'reset')) {
+    // Hubtel-settled: the online payment may cover only the transport DEPOSIT
+    // (out-of-radius). Confirming means the admin has collected any on-site
+    // balance in person, so it finalises the FULL amount (mirrors a cash full
+    // confirm) — never a deposit-only stamp. Undo rolls back to exactly what
+    // Hubtel settled (deposit or full). All hubtel.* fields are preserved so the
+    // received-from-Hubtel amount keeps showing.
+    if (hubtelPaid) {
+      const depositAmount = booking.payment.hubtel.amount;
+      const isDeposit = depositAmount != null && round2(depositAmount) < round2(booking.pricing.total);
+
+      if (mode === 'confirm' || mode === 'full') {
+        booking.payment.status = 'paid';
+        booking.payment.amountPaid = booking.pricing.total;
+        booking.payment.amountDue = 0;
+        booking.payment.confirmedManually = true;
+        booking.payment.confirmedBy = req.session.user.name;
+        booking.payment.confirmedAt = new Date();
+        await booking.save();
+        return res.json({ ok: true, status: booking.payment.status });
+      }
+      // unconfirm / reset — roll back to Hubtel's settled state.
       booking.payment.confirmedManually = false;
       booking.payment.confirmedBy = undefined;
       booking.payment.confirmedAt = undefined;
+      if (isDeposit) {
+        booking.payment.status = 'deposit_paid';
+        // Show the gross the client paid (with Hubtel's fee); bill the balance
+        // against the requested deposit so the due matches the on-site amount.
+        booking.payment.amountPaid = round2(booking.payment.hubtel.paidWithFees != null ? booking.payment.hubtel.paidWithFees : depositAmount);
+        booking.payment.amountDue = round2(booking.pricing.total - depositAmount);
+      } else {
+        booking.payment.status = 'paid';
+        booking.payment.amountPaid = round2(depositAmount != null ? depositAmount : booking.pricing.total);
+        booking.payment.amountDue = 0;
+      }
       await booking.save();
       return res.json({ ok: true, status: booking.payment.status });
     }

@@ -67,6 +67,7 @@ const bookingSchema = new mongoose.Schema({
       checkoutId: String,
       checkoutUrl: String,
       amount: Number, // amount we asked Hubtel to collect (deposit or full)
+      paidWithFees: Number, // gross the client actually paid (our amount + Hubtel's fee)
       raw: mongoose.Schema.Types.Mixed,
     },
     confirmedManually: { type: Boolean, default: false },

@@ -41,7 +41,19 @@
   .foot { text-align:center; color:var(--muted); font-size:12px; margin-top:26px; }
   .toolbar { text-align:center; margin:16px; }
   .toolbar button { background:var(--navy); color:#fff; border:0; padding:10px 22px; border-radius:8px; font-size:14px; cursor:pointer; }
-  @media print { .toolbar { display:none; } body { background:#fff; } .sheet { margin:0; border-width:3px; } @page { size: A4 landscape; margin:10mm; } }
+  /* Print PORTRAIT. The certificate reflows into a clean, upright single portrait
+     page — exactly how it already renders on mobile. Forcing landscape made
+     desktop system printers (e.g. "Microsoft Print to PDF", which defaults to
+     portrait paper) rotate the whole certificate 90° onto a portrait sheet.
+     Portrait is the reliable default on every device and printer. */
+  @page { size: A4 portrait; margin: 12mm; }
+  @media print {
+    .toolbar { display:none; }
+    body { background:#fff; }
+    /* Fill the portrait content box instead of the fixed 1040px landscape width,
+       so the layout reflows (as on mobile) rather than being rotated/scaled. */
+    .sheet { margin:0; width:100%; max-width:100%; padding:30px 34px; border-width:3px; page-break-inside:avoid; break-inside:avoid; }
+  }
 </style>
 </head>
 <body>

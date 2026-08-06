@@ -58,7 +58,7 @@ router.post('/webhook', async (req, res) => {
 // Polling endpoint for the success page. Returns the stored status; if the booking
 // is still unpaid on a Hubtel payment, do a live status check (covers the "no
 // callback within 5 minutes" case and local dev where Hubtel can't reach us).
-// The status endpoint only answers whitelisted IPs, so failures are swallowed.
+// Uses the public status endpoint (no IP whitelist); failures are swallowed.
 router.get('/status/:id', async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);

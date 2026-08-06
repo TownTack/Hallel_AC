@@ -112,16 +112,24 @@ function applyHubtelSuccess(booking, { amount, transactionId, raw }) {
   if (booking.payment.status === 'paid') return;
 
   const total = booking.pricing.total;
-  const paid = round2(amount);
+  const paid = round2(amount); // gross the client paid — includes Hubtel's fee
+  // The amount we actually asked Hubtel to collect (the transport deposit for
+  // out-of-radius, or the full total for pay-now). Hubtel adds its fee on top, so
+  // `paid` runs a pesewa or two above this. Bill the remaining balance against
+  // what we requested, NOT the fee-inflated `paid`, or the due comes out too low.
+  const requested = round2(
+    booking.payment.hubtel.amount != null ? booking.payment.hubtel.amount : (booking.transport.fee || paid)
+  );
 
   booking.payment.method = 'hubtel';
   booking.payment.amountPaid = paid;
-  if (paid >= total) {
+  booking.payment.hubtel.paidWithFees = paid;
+  if (requested >= total) {
     booking.payment.status = 'paid';
     booking.payment.amountDue = 0;
   } else {
     booking.payment.status = 'deposit_paid';
-    booking.payment.amountDue = round2(total - paid);
+    booking.payment.amountDue = round2(total - requested);
   }
   booking.payment.hubtel.transactionId = transactionId;
   booking.payment.hubtel.raw = raw;
