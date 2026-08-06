@@ -12,7 +12,11 @@ const { round2 } = require('./pricing');
 // ---------------------------------------------------------------------------
 
 const CHECKOUT_URL = 'https://payproxyapi.hubtel.com/items/initiate';
-const STATUS_BASE = 'https://api-txnstatus.hubtel.com/transactions';
+// Public Transaction Status Check (no IP whitelist required — authenticated by
+// Basic auth only). Confirmed working from a non-whitelisted host. The older
+// api-txnstatus.hubtel.com endpoint returned 403 unless the caller's IP was
+// whitelisted by Hubtel; this one does not.
+const STATUS_BASE = 'https://rmsc.hubtel.com/v1/merchantaccount/merchants';
 
 function authHeader() {
   const token = Buffer.from(`${env.hubtel.clientId}:${env.hubtel.clientSecret}`).toString('base64');
@@ -68,22 +72,32 @@ async function createCheckout({ amount, description, clientReference, returnUrl,
   }
 }
 
-// Poll a transaction's status (fallback). NB: the endpoint only responds to IPs
-// whitelisted by Hubtel — from anywhere else it returns 403 / times out, which we
-// swallow. Returns { ok, status ('Paid'|'Unpaid'|'Refunded'), amount, transactionId, raw }.
+// Poll a transaction's status (the mandatory fallback when no webhook arrives).
+// Uses the public status endpoint (no IP whitelist). The response is PascalCase
+// with `Data` as an ARRAY of transactions; we pick the one matching this
+// clientReference (or the first) and normalise `TransactionStatus: 'Success'` to
+// 'Paid' so callers stay unchanged.
+// Returns { ok, status ('Paid'|'Unpaid'|...), amount, transactionId, raw }.
 async function checkStatus(clientReference) {
   if (!env.hubtel.clientId || !env.hubtel.merchantAccount) {
     return { ok: false, reason: 'hubtel-not-configured' };
   }
   try {
-    const url = `${STATUS_BASE}/${env.hubtel.merchantAccount}/status`;
+    const url = `${STATUS_BASE}/${env.hubtel.merchantAccount}/transactions/status`;
     const res = await axios.get(url, {
       params: { clientReference },
       headers: { Authorization: authHeader() },
       timeout: 15000,
     });
-    const d = res.data?.data || {};
-    return { ok: true, status: d.status, amount: d.amount, transactionId: d.transactionId, raw: res.data };
+    if (res.data?.ResponseCode !== '0000') {
+      return { ok: false, reason: `responseCode ${res.data?.ResponseCode}`, raw: res.data };
+    }
+    const list = Array.isArray(res.data.Data) ? res.data.Data : [];
+    const d = list.find((t) => t.ClientReference === clientReference) || list[0] || {};
+    // 'Success' (payment approved) → 'Paid' for caller compatibility; anything
+    // else (Pending/Failed/Unpaid) is passed through unmapped.
+    const status = d.TransactionStatus === 'Success' ? 'Paid' : d.TransactionStatus;
+    return { ok: true, status, amount: d.TransactionAmount, transactionId: d.TransactionId, raw: res.data };
   } catch (err) {
     console.error('[hubtel] checkStatus failed:', err.response?.status || err.message);
     return { ok: false, reason: err.message };
