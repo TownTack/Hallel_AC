@@ -20,6 +20,22 @@ body { background: #f4f7fa; color: var(--hallel-ink); }
 .tank-row { background: #fff; border: 1px solid #e6edf3; border-radius: .6rem; }
 #map { height: 320px; border-radius: .6rem; border: 1px solid #e6edf3; }
 
+/* Service-type info cards — gentle lift draws attention to the explanation.
+   Desktop lifts on hover; touch devices lift via the .lifted class (tap handler
+   in booking.js); keyboard users get it via :focus-within. */
+.service-type-card {
+  background: #fff; border: 1px solid #e6edf3; border-radius: .8rem;
+  padding: 1.1rem 1.25rem; height: 100%; cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.service-type-card:hover,
+.service-type-card:focus-within,
+.service-type-card.lifted {
+  transform: translateY(-3px); box-shadow: 0 10px 24px rgba(16,36,63,.14);
+}
+.service-type-card h6 { color: var(--hallel-navy); font-weight: 700; margin-bottom: .4rem; }
+.service-type-card p { color: var(--hallel-ink); font-size: .9rem; margin: 0; }
+
 .summary-box { background: var(--hallel-navy); color: #fff; border-radius: 1rem; }
 .summary-box .total { font-size: 1.8rem; font-weight: 700; }
 .summary-box .total.total-custom { font-size: 1.05rem; font-weight: 600; line-height: 1.3; }

@@ -16,8 +16,8 @@ function unitPriceFor(settings, sizeKey, tier) {
  * what this returns.
  *
  * @param {Object} params
- * @param {Array}  params.tanks    [{ sizeKey, quantity }]
- * @param {String} params.tier     'standard' | 'preserve'
+ * @param {Array}  params.tanks    [{ sizeKey, quantity, tier }]  (tier is per-tank)
+ * @param {String} params.tier     fallback tier when a tank omits its own
  * @param {Object} params.latlng   { lat, lng } | null
  * @param {Object} settings        Settings document
  */
@@ -28,7 +28,9 @@ async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, se
 
   for (const t of tanks) {
     const qty = Math.max(1, parseInt(t.quantity, 10) || 0);
-    const found = unitPriceFor(settings, t.sizeKey, tier);
+    // Per-tank service type: the tank's own tier wins; fall back to the call-level default.
+    const lineTier = (t.tier || tier) === 'preserve' ? 'preserve' : 'standard';
+    const found = unitPriceFor(settings, t.sizeKey, lineTier);
     if (!found) continue;
     const { item, price } = found;
     const lineTotal = round2(price * qty);
@@ -39,6 +41,7 @@ async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, se
       label: item.label,
       capacityLitres: item.capacityLitres,
       quantity: qty,
+      tier: lineTier,
       unitPrice: price,
       lineTotal,
       custom: !!item.custom,

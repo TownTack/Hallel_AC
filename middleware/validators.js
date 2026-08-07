@@ -5,7 +5,6 @@ const bookingRules = [
   body('whatsapp').trim().notEmpty().withMessage('WhatsApp number is required.')
     .matches(/^[+0-9][0-9\s()-]{6,}$/).withMessage('Enter a valid phone number.'),
   body('email').optional({ checkFalsy: true }).isEmail().withMessage('Enter a valid email.').normalizeEmail(),
-  body('serviceTier').isIn(['standard', 'preserve']).withMessage('Choose a service tier.'),
   body('bookingDate').notEmpty().withMessage('Pick a service date.').isISO8601().withMessage('Invalid date.')
     .custom((v) => {
       const today = new Date();
@@ -22,6 +21,12 @@ const bookingRules = [
   body('tanks').custom((v) => {
     const arr = typeof v === 'string' ? JSON.parse(v) : v;
     if (!Array.isArray(arr) || arr.length === 0) throw new Error('Add at least one tank.');
+    // Service type is now chosen per tank; if present it must be a known tier.
+    for (const t of arr) {
+      if (t.tier != null && !['standard', 'preserve'].includes(t.tier)) {
+        throw new Error('Choose a valid service type for each tank.');
+      }
+    }
     return true;
   }),
 ];

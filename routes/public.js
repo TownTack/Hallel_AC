@@ -43,10 +43,9 @@ router.get('/', async (req, res) => {
 router.post('/api/quote', quoteLimiter, async (req, res) => {
   try {
     const settings = await Settings.get();
-    const tanks = parseTanks(req.body.tanks);
-    const tier = req.body.serviceTier === 'preserve' ? 'preserve' : 'standard';
+    const tanks = parseTanks(req.body.tanks); // each tank carries its own tier
     const latlng = parseLatLng(req.body);
-    const quote = await computeQuote({ tanks, tier, latlng }, settings);
+    const quote = await computeQuote({ tanks, latlng }, settings);
     res.json({ ok: true, quote });
   } catch (err) {
     console.error('[quote] error', err.message);
@@ -64,12 +63,11 @@ router.post('/booking', bookingLimiter, bookingRules, async (req, res, next) => 
       return res.redirect('/');
     }
 
-    const tanks = parseTanks(req.body.tanks);
-    const tier = req.body.serviceTier === 'preserve' ? 'preserve' : 'standard';
+    const tanks = parseTanks(req.body.tanks); // each tank carries its own tier
     const latlng = parseLatLng(req.body);
 
     // Recompute server-side — never trust amounts sent by the browser.
-    const quote = await computeQuote({ tanks, tier, latlng }, settings);
+    const quote = await computeQuote({ tanks, latlng }, settings);
     if (!quote.lines.length) {
       req.flash('error', 'Please add at least one valid tank.');
       return res.redirect('/');
@@ -100,8 +98,8 @@ router.post('/booking', bookingLimiter, bookingRules, async (req, res, next) => 
       clientName: req.body.clientName,
       whatsapp: req.body.whatsapp,
       email: req.body.email || undefined,
-      serviceTier: tier,
-      tanks: quote.lines,
+      tanks: quote.lines, // each line carries its own tier
+
       bookingDate: new Date(req.body.bookingDate),
       location: {
         address: req.body.address || '',

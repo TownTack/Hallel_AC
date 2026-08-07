@@ -24,9 +24,9 @@
       <h6 class="section-title">Service</h6>
       <div class="small">
         <div>Date: <strong><%= new Date(booking.bookingDate).toLocaleDateString('en-GB') %></strong></div>
-        <div>Tier: <%= booking.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard Clean' %></div>
+        <div>Service: <%= booking.serviceSummary === 'preserve' ? 'Clean & Preserve' : (booking.serviceSummary === 'mixed' ? 'Mixed' : 'Standard Clean') %></div>
         <ul class="mb-1 ps-3">
-          <% booking.tanks.forEach(t => { %><li><%= t.quantity %>× <%= t.label %> — GHS <%= t.lineTotal.toFixed(2) %></li><% }) %>
+          <% booking.tanks.forEach(t => { %><li><%= t.quantity %>× <%= t.label %> <span class="text-muted">(<%= (t.tier || booking.serviceTier) === 'preserve' ? 'Clean & Preserve' : 'Standard' %>)</span> — GHS <%= t.lineTotal.toFixed(2) %></li><% }) %>
         </ul>
       </div>
     </div>

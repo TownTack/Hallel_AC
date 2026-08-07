@@ -9,7 +9,7 @@
       <ul class="list-group list-group-flush text-start my-3">
         <li class="list-group-item d-flex justify-content-between"><span>Name</span><strong><%= booking.clientName %></strong></li>
         <li class="list-group-item d-flex justify-content-between"><span>Service date</span><strong><%= new Date(booking.bookingDate).toLocaleDateString('en-GB') %></strong></li>
-        <li class="list-group-item d-flex justify-content-between"><span>Service</span><strong><%= booking.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard Clean' %></strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Service</span><strong><%= booking.serviceSummary === 'preserve' ? 'Clean & Preserve' : (booking.serviceSummary === 'mixed' ? 'Mixed' : 'Standard Clean') %></strong></li>
         <li class="list-group-item d-flex justify-content-between"><span>Transport</span><strong><%= booking.transport.free ? 'Free' : 'GHS ' + booking.transport.fee.toFixed(2) %></strong></li>
         <% if (booking.pricing.customPending) { %>
           <li class="list-group-item d-flex justify-content-between"><span>Total</span><strong>A custom quote is required</strong></li>

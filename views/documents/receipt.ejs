@@ -59,7 +59,7 @@
     <tbody>
       <% booking.tanks.forEach(t => { %>
         <tr>
-          <td><%= t.label %> (<%= booking.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard' %>)</td>
+          <td><%= t.label %> (<%= (t.tier || booking.serviceTier) === 'preserve' ? 'Clean & Preserve' : 'Standard' %>)</td>
           <td class="num"><%= t.quantity %></td>
           <td class="num"><%= money(t.unitPrice) %></td>
           <td class="num"><%= money(t.lineTotal) %></td>

@@ -54,7 +54,7 @@
           <span class="status-dot <%= dot %>" title="<%= st %>"></span>
         </div>
         <div class="small mt-2">
-          <div><%= new Date(b.bookingDate).toLocaleDateString('en-GB') %> &middot; <%= b.serviceTier === 'preserve' ? 'Clean & Preserve' : 'Standard' %></div>
+          <div><%= new Date(b.bookingDate).toLocaleDateString('en-GB') %> &middot; <%= b.serviceSummary === 'preserve' ? 'Clean & Preserve' : (b.serviceSummary === 'mixed' ? 'Mixed' : 'Standard') %></div>
           <div><%= b.tanks.reduce((s,t)=>s+t.quantity,0) %> tank(s) &middot; <strong>GHS <%= b.pricing.total.toFixed(2) %></strong></div>
         </div>
         <div class="mt-2">

@@ -5,6 +5,10 @@ const tankLineSchema = new mongoose.Schema({
   label: { type: String, required: true },
   capacityLitres: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
+  // Service type chosen for THIS tank (per-tank since a booking may mix services).
+  // No default: legacy tanks (saved before this field) stay undefined so views can
+  // fall back to the booking-level serviceTier. New bookings always set it explicitly.
+  tier: { type: String, enum: ['standard', 'preserve'] },
   unitPrice: { type: Number, required: true },
   lineTotal: { type: Number, required: true },
   custom: { type: Boolean, default: false },
@@ -25,7 +29,9 @@ const bookingSchema = new mongoose.Schema({
   email: { type: String, trim: true, lowercase: true },
 
   // ---- Service ----
-  serviceTier: { type: String, enum: ['standard', 'preserve'], required: true },
+  // Legacy per-booking field. Service type is now chosen per tank (tankLine.tier);
+  // this remains only as a read fallback for bookings saved before that change.
+  serviceTier: { type: String, enum: ['standard', 'preserve'] },
   tanks: { type: [tankLineSchema], validate: v => Array.isArray(v) && v.length > 0 },
   bookingDate: { type: Date, required: true },
 
@@ -102,6 +108,15 @@ const bookingSchema = new mongoose.Schema({
 
   notes: String,
 }, { timestamps: true });
+
+// One-word service summary for list/success views: 'standard' | 'preserve' | 'mixed'.
+// Falls back to the legacy per-booking serviceTier for old bookings without per-tank tier.
+bookingSchema.virtual('serviceSummary').get(function () {
+  const tiers = new Set((this.tanks || []).map(t => t.tier).filter(Boolean));
+  if (tiers.size === 0) return this.serviceTier || 'standard';
+  if (tiers.size === 1) return [...tiers][0];
+  return 'mixed';
+});
 
 bookingSchema.pre('save', function () {
   if (!this.reference) this.reference = String(this._id).slice(-6).toUpperCase();

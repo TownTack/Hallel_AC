@@ -16,8 +16,7 @@
   }
   .certno { position:absolute; top:30px; right:56px; font-size:13px; color:var(--muted); }
   .head { text-align:center; }
-  .drop { width:34px; height:46px; background:var(--navy); border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
-          transform: rotate(0deg); margin:0 auto 6px; position:relative; clip-path: polygon(50% 0, 100% 60%, 50% 100%, 0 60%); }
+  .drop { display:block; width:40px; height:54px; margin:0 auto 6px; }
   .brand { font-size:30px; font-weight:800; color:var(--navy); letter-spacing:.3px; }
   .brand-sub { letter-spacing:4px; font-size:12px; font-weight:700; color:var(--blue); margin-top:2px; }
   .title { font-size:40px; font-weight:800; color:var(--navy); margin:18px 0 6px; text-align:center; }
@@ -59,15 +58,28 @@
 <body>
 <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
 <%
-  const tanks = booking.tanks.map(t => `${t.quantity}× ${t.label}`).join(', ');
+  const tierOf = t => (t.tier || booking.serviceTier) === 'preserve' ? 'Preserve' : 'Standard';
+  const tanks = booking.tanks.map(t => `${t.quantity}× ${t.label} (${tierOf(t)})`).join(', ');
   const dateSvc = new Date(booking.bookingDate).toLocaleDateString('en-GB');
   const nextDue = booking.certificate.nextServiceDue ? new Date(booking.certificate.nextServiceDue).toLocaleDateString('en-GB') : '';
-  const isStd = booking.serviceTier === 'standard';
+  // Per-tank service: tick each box that at least one tank used (both when mixed).
+  const hasPreserve = booking.tanks.some(t => (t.tier || booking.serviceTier) === 'preserve');
+  const hasStd = booking.tanks.some(t => (t.tier || booking.serviceTier) !== 'preserve');
 %>
 <div class="sheet">
   <div class="certno">Certificate No. <strong><%= booking.certificate.number %></strong></div>
   <div class="head">
-    <div class="drop"></div>
+    <svg class="drop" viewBox="0 0 40 54" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="dropIris" cx="20" cy="35" r="17" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7fdcff" />
+          <stop offset=".5" stop-color="#1b9dd9" />
+          <stop offset="1" stop-color="#0d3f66" />
+        </radialGradient>
+      </defs>
+      <path d="M20 2 C20 2 5 22 5 34 A15 15 0 1 0 35 34 C35 22 20 2 20 2 Z" fill="#10243f" />
+      <path d="M20 12 C12 22 12 40 20 46 C28 40 28 22 20 12 Z" fill="url(#dropIris)" />
+    </svg>
     <div class="brand"><%= cfg.businessInfo.name %></div>
     <div class="brand-sub">WATER TANK CLEANING &amp; DISINFECTION</div>
   </div>
@@ -89,8 +101,8 @@
 
   <div class="perf">
     <div class="lbl">Service Performed</div>
-    <span class="perf-item"><span class="box <%= isStd ? 'checked' : '' %>"></span> Standard Clean</span>
-    <span class="perf-item"><span class="box <%= !isStd ? 'checked' : '' %>"></span> Clean-and-Preserve</span>
+    <span class="perf-item"><span class="box <%= hasStd ? 'checked' : '' %>"></span> Standard Clean</span>
+    <span class="perf-item"><span class="box <%= hasPreserve ? 'checked' : '' %>"></span> Clean-and-Preserve</span>
   </div>
 
   <div class="bottom">

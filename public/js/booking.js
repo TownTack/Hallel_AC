@@ -90,13 +90,18 @@
 
   function addRow() {
     const row = document.createElement('div');
-    row.className = 'tank-row p-2 d-flex gap-2 align-items-center';
+    row.className = 'tank-row p-2 d-flex flex-wrap gap-2 align-items-center';
     row.innerHTML = `
-      <select class="form-select form-select-sm tank-size">${optionsHtml()}</select>
-      <input type="number" class="form-control form-control-sm tank-qty" style="max-width:90px" min="1" value="1" />
+      <select class="form-select form-select-sm tank-size flex-grow-1" style="min-width:150px">${optionsHtml()}</select>
+      <select class="form-select form-select-sm tank-tier" style="max-width:160px">
+        <option value="standard">Standard</option>
+        <option value="preserve">Clean &amp; Preserve</option>
+      </select>
+      <input type="number" class="form-control form-control-sm tank-qty" style="max-width:80px" min="1" value="1" />
       <button type="button" class="btn btn-sm btn-outline-danger remove-tank">&times;</button>`;
     rowsEl.appendChild(row);
     row.querySelector('.tank-size').addEventListener('change', refreshQuote);
+    row.querySelector('.tank-tier').addEventListener('change', refreshQuote);
     row.querySelector('.tank-qty').addEventListener('input', refreshQuote);
     row.querySelector('.remove-tank').addEventListener('click', () => { row.remove(); refreshQuote(); });
     refreshQuote();
@@ -106,6 +111,7 @@
   function collectTanks() {
     return [...rowsEl.querySelectorAll('.tank-row')].map((r) => ({
       sizeKey: r.querySelector('.tank-size').value,
+      tier: r.querySelector('.tank-tier').value === 'preserve' ? 'preserve' : 'standard',
       quantity: Math.max(1, parseInt(r.querySelector('.tank-qty').value, 10) || 1),
     }));
   }
@@ -125,8 +131,7 @@
       return;
     }
     const payload = {
-      tanks: JSON.stringify(tanks),
-      serviceTier: document.querySelector('input[name="serviceTier"]:checked').value,
+      tanks: JSON.stringify(tanks), // each tank carries its own tier
       lat: document.getElementById('lat').value,
       lng: document.getElementById('lng').value,
     };
@@ -143,7 +148,7 @@
 
   function renderQuote(q) {
     document.getElementById('summaryLines').innerHTML = q.lines
-      .map((l) => `<div class="d-flex justify-content-between"><span>${l.quantity}× ${l.label}</span><span>${money(l.lineTotal)}</span></div>`)
+      .map((l) => `<div class="d-flex justify-content-between"><span>${l.quantity}× ${l.label} <span class="text-white-50">(${l.tier === 'preserve' ? 'Clean & Preserve' : 'Standard'})</span></span><span>${money(l.lineTotal)}</span></div>`)
       .join('');
     document.getElementById('sumSubtotal').textContent = money(q.tanksSubtotal);
     document.getElementById('minCalloutNote').classList.toggle('d-none', !q.minCalloutApplied);
@@ -199,8 +204,15 @@
     document.getElementById('tanksInput').value = JSON.stringify(tanks);
   });
 
-  // Re-quote when tier changes.
-  document.querySelectorAll('input[name="serviceTier"]').forEach((r) => r.addEventListener('change', refreshQuote));
+  // Service-type info cards: lift on tap for touch devices (desktop uses :hover CSS).
+  const serviceCards = [...document.querySelectorAll('.service-type-card')];
+  serviceCards.forEach((card) => {
+    card.addEventListener('click', () => {
+      const wasLifted = card.classList.contains('lifted');
+      serviceCards.forEach((c) => c.classList.remove('lifted'));
+      if (!wasLifted) card.classList.add('lifted');
+    });
+  });
 
   // Start with one tank row.
   addRow();
