@@ -5,7 +5,7 @@ const router = express.Router();
 const Settings = require('../models/Settings');
 const Booking = require('../models/Booking');
 const { computeQuote, round2 } = require('../services/pricing');
-const { dispatchBookingNotifications } = require('../services/notifications');
+const { dispatchBookingNotifications, normaliseGh } = require('../services/notifications');
 const hubtel = require('../services/hubtel');
 const { bookingRules, collect } = require('../middleware/validators');
 const env = require('../config/env');
@@ -179,7 +179,9 @@ router.get('/booking/success/:id', async (req, res, next) => {
     if (!booking) return res.status(404).render('error', { title: 'Not found', message: 'Booking not found', status: 404 });
     const settings = await Settings.get();
     // wa.me deep link so the client can also message the business directly.
-    const waNumber = (settings.businessInfo.phone || '').replace(/[^0-9]/g, '');
+    // WhatsApp only accepts the full international number (233…) with no + or
+    // leading 0, so normalise via the same helper the SMS sender uses.
+    const waNumber = normaliseGh(settings.businessInfo.phone);
     res.render('public/success', { title: 'Booking Confirmed', booking, waNumber, baseUrl: env.baseUrl });
   } catch (err) {
     next(err);
