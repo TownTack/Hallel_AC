@@ -1,4 +1,4 @@
-const { getDistanceKm } = require('./distance');
+const { getDistanceKm } = require("./distance");
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -6,7 +6,7 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 function unitPriceFor(settings, sizeKey, tier) {
   const item = settings.priceList.find((p) => p.sizeKey === sizeKey);
   if (!item) return null;
-  const price = tier === 'preserve' ? item.preservePrice : item.standardPrice;
+  const price = tier === "preserve" ? item.preservePrice : item.standardPrice;
   return { item, price };
 }
 
@@ -21,7 +21,10 @@ function unitPriceFor(settings, sizeKey, tier) {
  * @param {Object} params.latlng   { lat, lng } | null
  * @param {Object} settings        Settings document
  */
-async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, settings) {
+async function computeQuote(
+  { tanks = [], tier = "standard", latlng = null },
+  settings,
+) {
   const lines = [];
   let tanksSubtotal = 0;
   const hasCustom = [];
@@ -29,7 +32,7 @@ async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, se
   for (const t of tanks) {
     const qty = Math.max(1, parseInt(t.quantity, 10) || 0);
     // Per-tank service type: the tank's own tier wins; fall back to the call-level default.
-    const lineTier = (t.tier || tier) === 'preserve' ? 'preserve' : 'standard';
+    const lineTier = (t.tier || tier) === "preserve" ? "preserve" : "standard";
     const found = unitPriceFor(settings, t.sizeKey, lineTier);
     if (!found) continue;
     const { item, price } = found;
@@ -51,17 +54,24 @@ async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, se
   tanksSubtotal = round2(tanksSubtotal);
 
   // Minimum call-out fee floor (business plan section 5).
-  const minCalloutApplied = tanksSubtotal > 0 && tanksSubtotal < settings.minCallOutFee;
-  const jobSubtotal = minCalloutApplied ? settings.minCallOutFee : tanksSubtotal;
+  const minCalloutApplied =
+    tanksSubtotal > 0 && tanksSubtotal < settings.minCallOutFee;
+  const jobSubtotal = minCalloutApplied
+    ? settings.minCallOutFee
+    : tanksSubtotal;
 
   // ---- Transport fee by distance ----
   let distanceKm = 0;
   let extraKm = 0;
   let transportFee = 0;
   if (latlng && latlng.lat != null && latlng.lng != null) {
-    distanceKm = await getDistanceKm(settings.baseLocation, latlng, settings.distanceProvider);
+    distanceKm = await getDistanceKm(
+      settings.baseLocation,
+      latlng,
+      settings.distanceProvider,
+    );
     extraKm = Math.max(0, distanceKm - settings.freeRadiusKm);
-    transportFee = round2(extraKm * settings.transportRatePerKm);
+    transportFee = round2(extraKm * 2 * settings.transportRatePerKm);
   }
   const free = transportFee === 0;
 
@@ -73,7 +83,7 @@ async function computeQuote({ tanks = [], tier = 'standard', latlng = null }, se
 
   return {
     lines,
-    currency: 'GHS',
+    currency: "GHS",
     tanksSubtotal,
     minCalloutApplied,
     minCallOutFee: settings.minCallOutFee,
