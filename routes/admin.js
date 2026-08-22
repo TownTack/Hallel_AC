@@ -7,6 +7,13 @@ const User = require('../models/User');
 const { requireAdmin } = require('../middleware/auth');
 const { ensureCertificateNumber, ensureReceiptNumber, rebookQrDataUrl } = require('../services/documents');
 const { round2 } = require('../services/pricing');
+const { schedulingConfig, startOfUtcDay, addDays, computeDuration } = require('../services/scheduling');
+const { estimateTravelMinutes } = require('../services/distance');
+const { cancelBooking, rescheduleBooking, changeReasonText } = require('../services/bookingChanges');
+const {
+  dispatchCancellationNotifications,
+  dispatchRescheduleNotifications,
+} = require('../services/notifications');
 
 // Everything under /admin requires a logged-in admin.
 router.use(requireAdmin);
@@ -14,11 +21,19 @@ router.use(requireAdmin);
 // ---- Dashboard ----
 router.get('/', async (req, res, next) => {
   try {
-    const { status, job, q } = req.query;
+    const { status, job, q, from, to } = req.query;
     const filter = {};
     if (status) filter['payment.status'] = status;
     if (job === 'completed') filter.jobCompleted = true;
     if (job === 'pending') filter.jobCompleted = false;
+    if (job === 'cancelled') filter.jobStatus = { $in: ['cancelled', 'no_show'] };
+
+    // Service-date range, so the operator can pull up "this week".
+    if (from || to) {
+      filter.bookingDate = {};
+      if (from) filter.bookingDate.$gte = startOfUtcDay(new Date(from));
+      if (to) filter.bookingDate.$lt = addDays(startOfUtcDay(new Date(to)), 1);
+    }
     if (q) {
       const rx = new RegExp(q.trim(), 'i');
       filter.$or = [{ clientName: rx }, { reference: rx }];
@@ -30,10 +45,30 @@ router.get('/', async (req, res, next) => {
       total: await Booking.countDocuments(),
       unpaid: await Booking.countDocuments({ 'payment.status': 'unpaid' }),
       paid: await Booking.countDocuments({ 'payment.status': 'paid' }),
-      pendingJobs: await Booking.countDocuments({ jobCompleted: false }),
+      // A cancelled booking is not outstanding work.
+      pendingJobs: await Booking.countDocuments({
+        jobCompleted: false,
+        jobStatus: { $nin: ['cancelled', 'no_show'] },
+      }),
+      cancelled: await Booking.countDocuments({ jobStatus: { $in: ['cancelled', 'no_show'] } }),
     };
 
-    res.render('admin/dashboard', { title: 'Admin Dashboard', bookings, stats, query: req.query });
+    // Custom-priced jobs the admin still has to place on the calendar.
+    const unscheduled = await Booking.find({
+      jobStatus: { $in: ['pending'] },
+      'schedule.startAt': { $exists: false },
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.render('admin/dashboard', {
+      title: 'Admin Dashboard',
+      bookings,
+      stats,
+      unscheduled,
+      query: req.query,
+      cfg: await Settings.get(),
+    });
   } catch (err) { next(err); }
 });
 
@@ -42,7 +77,7 @@ router.get('/bookings/:id', async (req, res, next) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).send('Not found');
-    res.render('admin/booking-detail', { booking, layout: false });
+    res.render('admin/booking-detail', { booking, cfg: await Settings.get(), layout: false });
   } catch (err) { next(err); }
 });
 
@@ -139,9 +174,142 @@ router.patch('/bookings/:id/job', async (req, res, next) => {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ ok: false });
     booking.jobCompleted = !booking.jobCompleted;
-    booking.jobStatus = booking.jobCompleted ? 'completed' : 'pending';
+    // Un-completing a job with a slot puts it back on the calendar rather than
+    // dropping it to 'pending', which now means 'not yet scheduled'.
+    if (booking.jobCompleted) {
+      booking.jobStatus = 'completed';
+    } else {
+      booking.jobStatus = booking.schedule && booking.schedule.startAt ? 'scheduled' : 'pending';
+    }
     await booking.save();
     res.json({ ok: true, jobCompleted: booking.jobCompleted });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// Calendar
+// ---------------------------------------------------------------------------
+
+// Colour vocabulary shared with the booking tiles so both tabs read as one UI.
+function eventColour(b) {
+  if (b.jobStatus === 'cancelled' || b.jobStatus === 'no_show') return '#c0392b';
+  if (b.jobCompleted || b.jobStatus === 'completed') return '#7f8c9a';
+  if (b.pricing && b.pricing.customPending) return '#8e44ad';
+  if (b.payment && b.payment.status === 'unpaid') return '#f6a623';
+  return '#1b9dd9';
+}
+
+// FullCalendar event feed. Travel/turnaround gaps are rendered as background
+// events so the operator can SEE why an apparently free hour is not bookable.
+// Each gap needs a drive-time lookup, so they are only computed for short
+// ranges (day/week views) and skipped for a whole month.
+router.get('/calendar/events', async (req, res, next) => {
+  try {
+    const settings = await Settings.get();
+    const cfg = schedulingConfig(settings);
+    const start = startOfUtcDay(new Date(req.query.start || Date.now()));
+    const end = req.query.end ? new Date(req.query.end) : addDays(start, 7);
+
+    const bookings = await Booking.find({ 'schedule.startAt': { $gte: start, $lt: end } })
+      .sort({ 'schedule.startAt': 1 })
+      .lean();
+
+    const events = bookings.map((b) => ({
+      id: String(b._id),
+      title: b.clientName + ' — ' + (b.tanks || []).map((t) => t.quantity + 'x ' + t.label).join(', '),
+      start: b.schedule.startAt,
+      end: b.schedule.endAt,
+      backgroundColor: eventColour(b),
+      borderColor: eventColour(b),
+      editable: !(b.jobCompleted || b.jobStatus === 'cancelled' || b.jobStatus === 'no_show'),
+      extendedProps: {
+        reference: b.reference,
+        clientName: b.clientName,
+        whatsapp: b.whatsapp,
+        address: b.location && b.location.address,
+        distanceKm: b.location && b.location.distanceKm,
+        total: b.pricing && b.pricing.total,
+        paymentStatus: b.payment && b.payment.status,
+        jobStatus: b.jobStatus,
+        durationMin: b.schedule.durationMin,
+        windowEndAt: b.schedule.windowEndAt,
+        customPending: !!(b.pricing && b.pricing.customPending),
+      },
+    }));
+
+    const spanDays = Math.round((end - start) / (24 * 3600 * 1000));
+    if (spanDays <= 14) {
+      const live = bookings.filter((b) => b.jobStatus !== 'cancelled' && b.jobStatus !== 'no_show');
+      const cache = new Map();
+      const travel = async (a, z) => {
+        const k = JSON.stringify([a && a.lat, a && a.lng, z && z.lat, z && z.lng]);
+        if (!cache.has(k)) cache.set(k, await estimateTravelMinutes(a, z, settings));
+        return cache.get(k);
+      };
+
+      for (let i = 0; i < live.length; i++) {
+        const b = live[i];
+        const next = live[i + 1];
+        const sameDay = next &&
+          startOfUtcDay(next.schedule.startAt).getTime() ===
+          startOfUtcDay(b.schedule.startAt).getTime();
+        const drive = sameDay
+          ? await travel(b.location, next.location)
+          : await travel(b.location, settings.baseLocation);
+        const need = sameDay ? Math.max(drive, cfg.minTurnaroundMin) : drive;
+        if (!need) continue;
+        events.push({
+          display: 'background',
+          start: b.schedule.endAt,
+          end: new Date(new Date(b.schedule.endAt).getTime() + need * 60000),
+          backgroundColor: 'rgba(246,166,35,.18)',
+          title: sameDay ? 'travel + turnaround' : 'return to base',
+        });
+      }
+    }
+
+    res.json(events);
+  } catch (err) { next(err); }
+});
+
+// Shared write path for every reschedule: the client manage link, the detail
+// modal and the calendar's drag-and-drop all land here, so none of them can
+// place a job the availability engine would reject.
+router.patch('/bookings/:id/schedule', async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ ok: false });
+    const settings = await Settings.get();
+
+    const result = await rescheduleBooking(booking, req.body.startAt, { by: 'admin' }, settings);
+    if (!result.ok) {
+      return res.status(409).json({ ok: false, error: changeReasonText(result.reason) });
+    }
+    await booking.save();
+    dispatchRescheduleNotifications(booking, settings, result.previous);
+    res.json({ ok: true, schedule: booking.schedule });
+  } catch (err) { next(err); }
+});
+
+router.patch('/bookings/:id/cancel', async (req, res, next) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ ok: false });
+    const settings = await Settings.get();
+
+    const result = cancelBooking(
+      booking,
+      { by: 'admin', reason: req.body.reason, noShow: req.body.noShow === 'true' },
+      settings
+    );
+    if (!result.ok) {
+      return res.status(409).json({ ok: false, error: changeReasonText(result.reason) });
+    }
+    if (!result.alreadyCancelled) {
+      await booking.save();
+      dispatchCancellationNotifications(booking, settings, 'admin');
+    }
+    res.json({ ok: true, jobStatus: booking.jobStatus, forfeited: !!result.forfeited });
   } catch (err) { next(err); }
 });
 
@@ -282,8 +450,55 @@ router.post('/settings', async (req, res, next) => {
     settings.distanceProvider = ['google', 'osrm'].includes(b.distanceProvider) ? b.distanceProvider : 'haversine';
     settings.adminNotifyNumber = b.adminNotifyNumber || '';
     settings.notificationsEnabled = b.notificationsEnabled === 'on';
+    settings.commitmentDepositPct = num(b.commitmentDepositPct, settings.commitmentDepositPct);
+
+    // ---- Scheduling ----
+    const sc = settings.scheduling;
+    const hhmm = (v, fallback) => (/^[0-9]{1,2}:[0-9]{2}$/.test(v || "") ? v : fallback);
+    sc.workDayStart = hhmm(b.workDayStart, sc.workDayStart);
+    sc.workDayEnd = hhmm(b.workDayEnd, sc.workDayEnd);
+
+    // Checkboxes: an unticked day simply is not submitted.
+    if (b.workingDays !== undefined) {
+      const raw = Array.isArray(b.workingDays) ? b.workingDays : [b.workingDays];
+      const days = raw.map((d) => parseInt(d, 10)).filter((d) => d >= 0 && d <= 6);
+      if (days.length) sc.workingDays = days;
+    }
+
+    sc.slotStepMin = num(b.slotStepMin, sc.slotStepMin);
+    sc.arrivalWindowMin = num(b.arrivalWindowMin, sc.arrivalWindowMin);
+    sc.siteSetupMin = num(b.siteSetupMin, sc.siteSetupMin);
+    sc.chlorineHoldMin = num(b.chlorineHoldMin, sc.chlorineHoldMin);
+    sc.multiTankStaggerMin = num(b.multiTankStaggerMin, sc.multiTankStaggerMin);
+    sc.minTurnaroundMin = num(b.minTurnaroundMin, sc.minTurnaroundMin);
+    sc.travelSpeedKmh = num(b.travelSpeedKmh, sc.travelSpeedKmh);
+    sc.travelRoadFactor = num(b.travelRoadFactor, sc.travelRoadFactor);
+    sc.maxHorizonDays = num(b.maxHorizonDays, sc.maxHorizonDays);
+    sc.maxJobsPerDay = num(b.maxJobsPerDay, sc.maxJobsPerDay);
+    sc.holdTtlMinutes = num(b.holdTtlMinutes, sc.holdTtlMinutes);
+    sc.holdingTankLitres = num(b.holdingTankLitres, sc.holdingTankLitres);
+    sc.cancellationCutoffHours = num(b.cancellationCutoffHours, sc.cancellationCutoffHours);
+
+    // A lead time below the cancellation cutoff would let a client book a slot
+    // they are instantly unable to change online, so it is clamped up.
+    sc.minLeadTimeHours = Math.max(
+      num(b.minLeadTimeHours, sc.minLeadTimeHours),
+      sc.cancellationCutoffHours
+    );
+
+    // Blackout dates arrive as one date per line.
+    if (b.blackoutDates !== undefined) {
+      sc.blackoutDates = String(b.blackoutDates)
+        .split(new RegExp("[\r\n,]+"))
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .map((d) => new Date(d))
+        .filter((d) => !Number.isNaN(d.getTime()));
+    }
 
     // Price list rows arrive as parallel arrays keyed by sizeKey.
+    const prior = {};
+    for (const row of settings.priceList || []) prior[row.sizeKey] = row;
     if (Array.isArray(b.sizeKey)) {
       settings.priceList = b.sizeKey.map((key, i) => ({
         sizeKey: key,
@@ -291,6 +506,17 @@ router.post('/settings', async (req, res, next) => {
         capacityLitres: parseFloat(b.capacityLitres[i]) || 0,
         standardPrice: parseFloat(b.standardPrice[i]) || 0,
         preservePrice: parseFloat(b.preservePrice[i]) || 0,
+        // Durations feed the availability engine. Falling back to the stored
+        // row matters: without it a settings save would silently reset every
+        // size to the schema default and wreck the schedule.
+        standardCleanMin: num(
+          b.standardCleanMin && b.standardCleanMin[i],
+          (prior[key] && prior[key].standardCleanMin) || 30
+        ),
+        preserveCleanMin: num(
+          b.preserveCleanMin && b.preserveCleanMin[i],
+          (prior[key] && prior[key].preserveCleanMin) || 60
+        ),
         custom: Array.isArray(b.custom) ? b.custom.includes(key) : false,
       }));
     }

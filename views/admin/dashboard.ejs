@@ -13,6 +13,20 @@
   <div class="col-6 col-md-3"><div class="card stat-card p-3"><div class="text-muted small">Jobs pending</div><div class="h4 mb-0"><%= stats.pendingJobs %></div></div></div>
 </div>
 
+<ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-list" data-bs-toggle="tab"
+            data-bs-target="#pane-list" type="button" role="tab">Bookings</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-calendar" data-bs-toggle="tab"
+            data-bs-target="#pane-calendar" type="button" role="tab">Calendar</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active" id="pane-list" role="tabpanel">
+
 <!-- Filters -->
 <form class="row g-2 mb-4" method="GET">
   <div class="col-md-3"><input class="form-control form-control-sm" name="q" placeholder="Search name or ref…" value="<%= query.q || '' %>" /></div>
@@ -29,9 +43,17 @@
       <option value="">All jobs</option>
       <option value="pending" <%= query.job === 'pending' ? 'selected' : '' %>>Job pending</option>
       <option value="completed" <%= query.job === 'completed' ? 'selected' : '' %>>Job completed</option>
+      <option value="cancelled" <%= query.job === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
     </select>
   </div>
+  <div class="col-md-3 col-6">
+    <input type="date" class="form-control form-control-sm" name="from" value="<%= query.from || '' %>" title="Service date from" />
+  </div>
+  <div class="col-md-3 col-6">
+    <input type="date" class="form-control form-control-sm" name="to" value="<%= query.to || '' %>" title="Service date to" />
+  </div>
   <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">Filter</button></div>
+  <div class="col-md-3"><a href="/admin" class="btn btn-sm btn-outline-secondary w-100">Clear</a></div>
 </form>
 
 <!-- Cards -->
@@ -54,11 +76,21 @@
           <span class="status-dot <%= dot %>" title="<%= st %>"></span>
         </div>
         <div class="small mt-2">
-          <div><%= new Date(b.bookingDate).toLocaleDateString('en-GB') %> &middot; <%= b.serviceSummary === 'preserve' ? 'Clean & Preserve' : (b.serviceSummary === 'mixed' ? 'Mixed' : 'Standard') %></div>
+          <div>
+            <%= new Date(b.bookingDate).toLocaleDateString('en-GB') %>
+            <% if (b.schedule && b.schedule.startAt) { %>
+              <span class="text-muted"><%= new Date(b.schedule.startAt).toISOString().slice(11,16) %>&ndash;<%= new Date(b.schedule.windowEndAt || b.schedule.startAt).toISOString().slice(11,16) %></span>
+            <% } %>
+            &middot; <%= b.serviceSummary === 'preserve' ? 'Clean & Preserve' : (b.serviceSummary === 'mixed' ? 'Mixed' : 'Standard') %>
+          </div>
           <div><%= b.tanks.reduce((s,t)=>s+t.quantity,0) %> tank(s) &middot; <strong>GHS <%= b.pricing.total.toFixed(2) %></strong></div>
         </div>
         <div class="mt-2">
-          <% if (b.jobCompleted) { %><span class="badge bg-success">Job done</span><% } else { %><span class="badge bg-secondary">Job pending</span><% } %>
+          <% if (b.jobStatus === 'cancelled' || b.jobStatus === 'no_show') { %>
+            <span class="badge bg-danger"><%= b.jobStatus === 'no_show' ? 'No show' : 'Cancelled' %></span>
+          <% } else if (b.jobCompleted) { %><span class="badge bg-success">Job done</span>
+          <% } else if (b.jobStatus === 'scheduled') { %><span class="badge bg-primary">Scheduled</span>
+          <% } else { %><span class="badge bg-secondary">Needs scheduling</span><% } %>
           <% if (st === 'paid') { %><span class="badge bg-success">Paid</span><% } %>
           <% if (!b.transport.free && st === 'unpaid') { %><span class="badge badge-fee">Transport GHS <%= b.transport.fee.toFixed(2) %></span><% } %>
         </div>
@@ -67,6 +99,49 @@
   <% }) %>
 </div>
 
+</div><!-- /pane-list -->
+
+<div class="tab-pane fade" id="pane-calendar" role="tabpanel">
+  <div class="row g-3">
+    <div class="col-lg-9">
+      <div class="card p-3"><div id="adminCalendar"></div></div>
+    </div>
+    <div class="col-lg-3">
+      <div class="card p-3">
+        <h6 class="section-title">Needs scheduling</h6>
+        <p class="small text-muted mb-2">
+          Custom-priced jobs have no confirmed time. Settle the quote, then drag
+          one onto the calendar.
+        </p>
+        <div id="unscheduledList">
+          <% if (!unscheduled.length) { %>
+            <p class="small text-muted mb-0">Nothing waiting.</p>
+          <% } %>
+          <% unscheduled.forEach(b => { %>
+            <div class="unscheduled-item" data-id="<%= b._id %>">
+              <div class="fw-semibold small"><%= b.clientName %></div>
+              <div class="text-muted" style="font-size:.75rem">
+                Ref <%= b.reference %> &middot; asked for <%= new Date(b.bookingDate).toLocaleDateString('en-GB') %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h6 class="section-title">Key</h6>
+        <div class="cal-key"><span style="background:#1b9dd9"></span>Scheduled</div>
+        <div class="cal-key"><span style="background:#f6a623"></span>Awaiting payment</div>
+        <div class="cal-key"><span style="background:#8e44ad"></span>Custom quote</div>
+        <div class="cal-key"><span style="background:#7f8c9a"></span>Completed</div>
+        <div class="cal-key"><span style="background:#c0392b"></span>Cancelled</div>
+        <div class="cal-key"><span style="background:rgba(246,166,35,.35)"></span>Travel + turnaround</div>
+      </div>
+    </div>
+  </div>
+</div><!-- /pane-calendar -->
+</div><!-- /tab-content -->
+
 <!-- Detail modal -->
 <div class="modal fade" id="detailModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -74,4 +149,16 @@
   </div>
 </div>
 
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script type="application/json" id="calendarConfig">
+  {
+    "workDayStart": "<%= cfg.scheduling.workDayStart %>",
+    "workDayEnd": "<%= cfg.scheduling.workDayEnd %>",
+    "workingDays": <%- JSON.stringify(cfg.scheduling.workingDays) %>,
+    "slotStepMin": <%= cfg.scheduling.slotStepMin %>,
+    "maxJobsPerDay": <%= cfg.scheduling.maxJobsPerDay %>
+  }
+</script>
 <script defer src="/js/admin.js"></script>
+<script defer src="/js/admin-calendar.js"></script>

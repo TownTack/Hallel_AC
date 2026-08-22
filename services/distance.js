@@ -66,4 +66,25 @@ async function getDistanceKm(base, dest, provider = 'haversine') {
   return haversine(base, dest);
 }
 
-module.exports = { getDistanceKm, haversine };
+// Drive time in minutes between two points, used by the availability engine to
+// decide whether the crew can actually get from one job to the next.
+//
+// Haversine returns a straight line, so it is scaled by travelRoadFactor before
+// the average speed is applied. The google/osrm providers already return road
+// distance, so they are not inflated a second time. If a provider ever exposes a
+// real duration, this is the single place that has to change.
+async function estimateTravelMinutes(from, to, settings) {
+  if (!from || !to) return 0;
+  if (from.lat == null || from.lng == null || to.lat == null || to.lng == null) return 0;
+
+  const cfg = (settings && settings.scheduling) || {};
+  const speedKmh = cfg.travelSpeedKmh > 0 ? cfg.travelSpeedKmh : 25;
+  const roadFactor = cfg.travelRoadFactor > 0 ? cfg.travelRoadFactor : 1.3;
+  const provider = (settings && settings.distanceProvider) || "haversine";
+
+  const km = await getDistanceKm(from, to, provider);
+  const roadKm = provider === "haversine" ? km * roadFactor : km;
+  return Math.round((roadKm / speedKmh) * 60);
+}
+
+module.exports = { getDistanceKm, haversine, estimateTravelMinutes };

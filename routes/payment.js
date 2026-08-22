@@ -4,6 +4,7 @@ const Booking = require('../models/Booking');
 const Settings = require('../models/Settings');
 const hubtel = require('../services/hubtel');
 const { dispatchBookingNotifications } = require('../services/notifications');
+const { confirmHoldAfterPayment } = require('../services/holds');
 
 // ---------------------------------------------------------------------------
 // Hubtel Online Checkout (Redirect Checkout) server endpoints.
@@ -43,6 +44,8 @@ router.post('/webhook', async (req, res) => {
           transactionId: data.CheckoutId,
           raw: body,
         });
+        // The slot was only held until now; promote it to a confirmed job.
+        await confirmHoldAfterPayment(booking, await Settings.get());
         await booking.save();
         await notifyOnFirstPayment(booking, wasUnpaid);
       } else {
@@ -72,6 +75,7 @@ router.get('/status/:id', async (req, res) => {
           transactionId: check.transactionId,
           raw: check.raw,
         });
+        await confirmHoldAfterPayment(booking, await Settings.get());
         await booking.save();
         await notifyOnFirstPayment(booking, true);
       }
@@ -88,6 +92,8 @@ router.get('/status/:id', async (req, res) => {
 // the checkout redirect; since payment was cancelled we delete the still-unpaid,
 // never-notified booking and send the client back to the form. Guarded so a
 // genuinely paid booking (transactionId present) is never removed.
+// Deleting it also releases the slot hold immediately, rather than leaving the
+// slot blocked until the TTL lapses.
 router.get('/cancel/:id', async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);

@@ -50,6 +50,27 @@ function money(n) {
   return `GHS ${Number(n || 0).toFixed(2)}`;
 }
 
+// Ghana is UTC+0 year-round, and the scheduling engine works in UTC, so the
+// UTC clock time IS the local wall-clock time the client will see.
+function hhmm(date) {
+  return new Date(date).toISOString().slice(11, 16);
+}
+
+// "Mon 07:15-08:00" — the arrival window promised to the client.
+function arrivalWindow(booking) {
+  const sch = booking.schedule;
+  if (!sch || !sch.startAt) return null;
+  const end = sch.windowEndAt || sch.startAt;
+  return hhmm(sch.startAt) + "-" + hhmm(end);
+}
+
+// Tokenised self-serve link for cancelling or rescheduling. Kept short so the
+// SMS stays within one segment.
+function manageLink(booking) {
+  if (!booking.reference || !booking.manageToken) return null;
+  return env.baseUrl + "/b/" + booking.reference + "/" + booking.manageToken;
+}
+
 function bookingSummaryLine(booking) {
   const tanks = booking.tanks
     .map((t) => `${t.quantity}x ${t.label}`)
@@ -66,9 +87,13 @@ async function sendBookingConfirmation(booking, settings) {
   const totalLine = booking.pricing.customPending
     ? 'You will receive a call soon to scope out the total cost of the service.'
     : `Total ${money(booking.pricing.total)}.`;
+  const win = arrivalWindow(booking);
+  const when = win ? `${date} between ${win}` : date;
+  const link = manageLink(booking);
   const msg =
-    `Hallel AquaCare: booking received (ref ${ref}) for ${date}. ` +
-    `${totalLine} We'll be in touch. Thank you!`;
+    `Hallel AquaCare: booking received (ref ${ref}) for ${when}. ` +
+    `${totalLine}` +
+    (link ? ` Change or cancel: ${link}` : ` We'll be in touch.`);
   return sendSms(booking.whatsapp, msg, settings);
 }
 
@@ -84,10 +109,63 @@ async function notifyAdmin(booking, settings) {
   const totalLine = booking.pricing.customPending
     ? 'Custom quote — call client to scope the total cost.'
     : `Total ${money(booking.pricing.total)}.`;
+  const win = arrivalWindow(booking);
   const msg =
-    `New booking: ${booking.clientName} (${booking.whatsapp}) on ${date}. ` +
+    `New booking: ${booking.clientName} (${booking.whatsapp}) on ${date}` +
+    (win ? ` at ${win}` : ' (time to be confirmed)') + `. ` +
     `${tanks}. ${totalLine}`;
   return sendSms(to, msg, settings);
+}
+
+// ---- Cancellation / reschedule -------------------------------------------
+
+async function dispatchCancellationNotifications(booking, settings, by) {
+  if (settings && settings.notificationsEnabled === false) return;
+  const { date } = bookingSummaryLine(booking);
+  const ref = booking.reference;
+  const forfeited = booking.cancellation && booking.cancellation.depositForfeited;
+
+  const clientMsg =
+    `Hallel AquaCare: your booking ${ref} for ${date} has been cancelled.` +
+    (forfeited
+      ? ' As it was cancelled at short notice the commitment deposit is not refundable.'
+      : ' Any deposit you paid will be refunded.') +
+    ' Call us to rebook.';
+  sendSms(booking.whatsapp, clientMsg, settings).catch((e) =>
+    console.error('[sms] cancel client notify error', e.message));
+
+  const to = settings && settings.adminNotifyNumber;
+  if (!to) return;
+  const win = arrivalWindow(booking);
+  const adminMsg =
+    `CANCELLED (${by}): ${booking.clientName} (${booking.whatsapp}), ref ${ref}, ` +
+    `${date}${win ? ' ' + win : ''}. Slot is free again.`;
+  sendSms(to, adminMsg, settings).catch((e) =>
+    console.error('[sms] cancel admin notify error', e.message));
+}
+
+async function dispatchRescheduleNotifications(booking, settings, previous) {
+  if (settings && settings.notificationsEnabled === false) return;
+  const { date } = bookingSummaryLine(booking);
+  const ref = booking.reference;
+  const win = arrivalWindow(booking);
+  const when = win ? `${date} between ${win}` : date;
+  const link = manageLink(booking);
+
+  const clientMsg =
+    `Hallel AquaCare: booking ${ref} has been moved to ${when}.` +
+    (link ? ` Change or cancel: ${link}` : '');
+  sendSms(booking.whatsapp, clientMsg, settings).catch((e) =>
+    console.error('[sms] reschedule client notify error', e.message));
+
+  const to = settings && settings.adminNotifyNumber;
+  if (!to) return;
+  const was = previous && previous.startAt
+    ? new Date(previous.startAt).toLocaleDateString('en-GB') + ' ' + hhmm(previous.startAt)
+    : 'unscheduled';
+  const adminMsg = `MOVED: ${booking.clientName}, ref ${ref}, ${was} -> ${when}.`;
+  sendSms(to, adminMsg, settings).catch((e) =>
+    console.error('[sms] reschedule admin notify error', e.message));
 }
 
 // Fire both without blocking the caller's response.
@@ -102,4 +180,9 @@ module.exports = {
   sendBookingConfirmation,
   notifyAdmin,
   dispatchBookingNotifications,
+  dispatchCancellationNotifications,
+  dispatchRescheduleNotifications,
+  arrivalWindow,
+  manageLink,
+  hhmm,
 };

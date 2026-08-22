@@ -24,6 +24,18 @@
       <h6 class="section-title">Service</h6>
       <div class="small">
         <div>Date: <strong><%= new Date(booking.bookingDate).toLocaleDateString('en-GB') %></strong></div>
+        <% if (booking.schedule && booking.schedule.startAt) { %>
+          <div>
+            Arrival window:
+            <strong><%= new Date(booking.schedule.startAt).toISOString().slice(11,16) %>&ndash;<%= new Date(booking.schedule.windowEndAt || booking.schedule.startAt).toISOString().slice(11,16) %></strong>
+            <span class="text-muted">(on site until about <%= new Date(booking.schedule.endAt).toISOString().slice(11,16) %>)</span>
+          </div>
+        <% } else { %>
+          <div class="text-warning-emphasis">No arrival time yet — schedule this job on the Calendar tab.</div>
+        <% } %>
+        <% if (booking.scheduleHistory && booking.scheduleHistory.length) { %>
+          <div class="text-muted">Moved <%= booking.scheduleHistory.length %> time(s).</div>
+        <% } %>
         <div>Service: <%= booking.serviceSummary === 'preserve' ? 'Clean & Preserve' : (booking.serviceSummary === 'mixed' ? 'Mixed' : 'Standard Clean') %></div>
         <ul class="mb-1 ps-3">
           <% booking.tanks.forEach(t => { %><li><%= t.quantity %>× <%= t.label %> <span class="text-muted">(<%= (t.tier || booking.serviceTier) === 'preserve' ? 'Clean & Preserve' : 'Standard' %>)</span> — GHS <%= t.lineTotal.toFixed(2) %></li><% }) %>
@@ -98,6 +110,48 @@
     <a class="btn btn-sm btn-outline-dark" href="/admin/bookings/<%= booking._id %>/receipt" target="_blank">Generate receipt</a>
     <a class="btn btn-sm btn-outline-dark" href="/admin/bookings/<%= booking._id %>/certificate" target="_blank">Generate certificate</a>
   </div>
+
+  <% const cancelled = booking.jobStatus === 'cancelled' || booking.jobStatus === 'no_show'; %>
+  <% if (cancelled) { %>
+    <div class="alert alert-danger py-2 small mb-3">
+      <strong><%= booking.jobStatus === 'no_show' ? 'Marked as a no-show' : 'Cancelled' %></strong>
+      <% if (booking.cancellation && booking.cancellation.cancelledAt) { %>
+        on <%= new Date(booking.cancellation.cancelledAt).toLocaleString('en-GB') %>
+        by <%= booking.cancellation.cancelledBy %>
+      <% } %>
+      <% if (booking.cancellation && booking.cancellation.reason) { %>
+        &mdash; &ldquo;<%= booking.cancellation.reason %>&rdquo;
+      <% } %>
+      <div>
+        Deposit:
+        <% if (booking.cancellation && booking.cancellation.depositForfeited) { %>
+          <strong>forfeited</strong> (cancelled inside the notice period)
+        <% } else if (booking.cancellation && booking.cancellation.refundStatus === 'pending') { %>
+          <strong>refund pending</strong> &mdash; refund GHS
+          <%= (booking.payment.amountPaid || 0).toFixed(2) %> in Hubtel, then note it here
+        <% } else { %>nothing collected<% } %>
+      </div>
+      The slot has been released.
+    </div>
+  <% } else if (!booking.jobCompleted) { %>
+    <div class="card p-3 mb-3 border-danger-subtle">
+      <h6 class="section-title text-danger">Cancel this job</h6>
+      <p class="small text-muted mb-2">
+        Frees the slot for other customers and texts the client. Inside the
+        <%= cfg.scheduling.cancellationCutoffHours %>-hour notice period the
+        commitment deposit is recorded as forfeited.
+      </p>
+      <form class="row g-2 js-cancel">
+        <div class="col-md-7">
+          <input class="form-control form-control-sm" name="reason" maxlength="200" placeholder="Reason (optional)" />
+        </div>
+        <div class="col-md-5 d-flex gap-2">
+          <button class="btn btn-sm btn-outline-danger flex-fill" name="noShow" value="false" type="submit">Cancel</button>
+          <button class="btn btn-sm btn-outline-secondary flex-fill" name="noShow" value="true" type="submit">No-show</button>
+        </div>
+      </form>
+    </div>
+  <% } %>
 
   <!-- Settle custom quote — available whenever the booking has a custom-priced tank,
        so a mistaken price can be corrected after it's first settled. -->

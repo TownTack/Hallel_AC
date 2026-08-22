@@ -12,6 +12,10 @@ const bookingRules = [
       if (new Date(v) < today) throw new Error("Service date can't be in the past.");
       return true;
     }),
+  // The chosen arrival window. Absent only for custom-priced jobs, which are
+  // request-then-confirm; POST /booking enforces that distinction and revalidates
+  // the time against services/availability.js before saving.
+  body('startAt').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid arrival time.'),
   body('lat').custom((v, { req }) => {
     if (!Number.isFinite(parseFloat(v)) || !Number.isFinite(parseFloat(req.body.lng))) {
       throw new Error('Please pick your service location on the map.');

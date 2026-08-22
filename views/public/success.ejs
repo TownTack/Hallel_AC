@@ -1,4 +1,12 @@
 <% layout('layouts/boilerplate') %>
+<%
+  // Ghana is UTC+0 and the scheduler stores UTC, so the UTC clock time IS the
+  // local time the client will see.
+  const sch = booking.schedule || {};
+  const hhmm = (d) => new Date(d).toISOString().slice(11, 16);
+  const arrivalWindow = sch.startAt ? hhmm(sch.startAt) + ' – ' + hhmm(sch.windowEndAt || sch.startAt) : null;
+  const manageUrl = booking.manageToken ? '/b/' + booking.reference + '/' + booking.manageToken : null;
+%>
 <div class="row justify-content-center">
   <div class="col-lg-7">
     <div class="card booking-card p-4 p-md-5 text-center">
@@ -9,6 +17,10 @@
       <ul class="list-group list-group-flush text-start my-3">
         <li class="list-group-item d-flex justify-content-between"><span>Name</span><strong><%= booking.clientName %></strong></li>
         <li class="list-group-item d-flex justify-content-between"><span>Service date</span><strong><%= new Date(booking.bookingDate).toLocaleDateString('en-GB') %></strong></li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span>Arrival window</span>
+          <strong><%= arrivalWindow || 'We will call to confirm your time' %></strong>
+        </li>
         <li class="list-group-item d-flex justify-content-between"><span>Service</span><strong><%= booking.serviceSummary === 'preserve' ? 'Clean & Preserve' : (booking.serviceSummary === 'mixed' ? 'Mixed' : 'Standard Clean') %></strong></li>
         <li class="list-group-item d-flex justify-content-between"><span>Transport</span><strong><%= booking.transport.free ? 'Free' : 'GHS ' + booking.transport.fee.toFixed(2) %></strong></li>
         <% if (booking.pricing.customPending) { %>
@@ -19,7 +31,10 @@
         <% } %>
       </ul>
 
-      <p class="small text-muted">A confirmation SMS has been sent to <%= booking.whatsapp %>.</p>
+      <p class="small text-muted">
+        A confirmation SMS has been sent to <%= booking.whatsapp %>
+        <% if (manageUrl) { %> with a link to change or cancel this booking<% } %>.
+      </p>
 
       <div class="d-flex gap-2 justify-content-center">
         <% if (waNumber) { %>
@@ -28,7 +43,10 @@
             Message us on WhatsApp
           </a>
         <% } %>
-        <a class="btn btn-outline-primary" href="/">Make another booking</a>
+        <% if (manageUrl) { %>
+          <a class="btn btn-outline-primary" href="<%= manageUrl %>">Change or cancel</a>
+        <% } %>
+        <a class="btn btn-outline-secondary" href="/">Make another booking</a>
       </div>
     </div>
   </div>

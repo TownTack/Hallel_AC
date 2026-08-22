@@ -51,3 +51,53 @@ body { background: #f4f7fa; color: var(--hallel-ink); }
 .status-unpaid { background: #c0392b; }
 
 .stat-card { border-radius: .8rem; border: none; box-shadow: 0 6px 18px rgba(16,36,63,.06); }
+
+/* ---- Arrival-window picker (public/js/slot-picker.js) ----
+   Shared by the booking form and the client's reschedule page. */
+/* Capped width: the grid uses square cells, so a full-column-width calendar
+   would render absurdly tall rows on desktop. */
+.slot-picker { background:#fff; border:1px solid #e6edf3; border-radius:.6rem; padding:.75rem; max-width:26rem; }
+.slot-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; }
+.slot-head .sp-month { color:var(--hallel-navy); }
+.slot-dow, .slot-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:.25rem; }
+.slot-dow span { text-align:center; font-size:.7rem; text-transform:uppercase; color:#8a99a8; padding-bottom:.2rem; }
+.slot-grid.is-loading { opacity:.5; }
+.slot-day {
+  position:relative; aspect-ratio:1/1; border:1px solid transparent; background:transparent;
+  border-radius:.45rem; font-size:.85rem; color:#b3bfca; padding:0;
+}
+.slot-day.empty { visibility:hidden; }
+.slot-day.open { color:var(--hallel-navy); background:#eef7fc; border-color:#cde8f6; font-weight:600; cursor:pointer; }
+.slot-day.open:hover { background:#d9eefa; }
+.slot-day.selected { background:var(--hallel-blue); border-color:var(--hallel-blue); color:#fff; }
+.slot-day .slot-dot {
+  position:absolute; left:50%; bottom:.28rem; transform:translateX(-50%);
+  width:4px; height:4px; border-radius:50%; background:var(--hallel-blue);
+}
+.slot-day.selected .slot-dot { background:#fff; }
+.slot-times { margin-top:.75rem; }
+.slot-times-head { font-size:.8rem; color:#6b7a89; margin-bottom:.4rem; }
+.slot-chips { display:flex; flex-wrap:wrap; gap:.4rem; max-height:11rem; overflow-y:auto; }
+.slot-chip {
+  border:1px solid #cde8f6; background:#fff; color:var(--hallel-navy);
+  border-radius:2rem; padding:.3rem .7rem; font-size:.8rem; white-space:nowrap;
+}
+.slot-chip:hover { background:#eef7fc; }
+.slot-chip.active { background:var(--hallel-blue); border-color:var(--hallel-blue); color:#fff; font-weight:600; }
+.slot-chosen { background:#eef7fc; border:1px solid #cde8f6; border-radius:.5rem; padding:.5rem .75rem; }
+
+/* ---- Admin calendar tab ---- */
+#adminCalendar { --fc-border-color:#e6edf3; --fc-today-bg-color:#eef7fc; font-size:.85rem; }
+#adminCalendar .fc-toolbar-title { font-size:1.05rem; color:var(--hallel-navy); }
+#adminCalendar .fc-event { cursor:pointer; }
+#adminCalendar .fc-event-title { white-space:normal; }
+.cal-key { display:flex; align-items:center; gap:.5rem; font-size:.78rem; margin-bottom:.3rem; }
+.cal-key span { width:.9rem; height:.9rem; border-radius:.2rem; display:inline-block; flex:0 0 auto; }
+.unscheduled-item {
+  border:1px solid #e6edf3; border-left:3px solid #8e44ad; border-radius:.4rem;
+  padding:.45rem .6rem; margin-bottom:.4rem; cursor:grab; background:#fff;
+}
+.unscheduled-item:active { cursor:grabbing; }
+.cal-flash { font-size:.85rem; border-radius:.4rem; }
+.cal-flash.ok  { background:#e8f6ee; color:#1e7a45; padding:.5rem .75rem; margin-bottom:.5rem; }
+.cal-flash.err { background:#fdecea; color:#a12a1d; padding:.5rem .75rem; margin-bottom:.5rem; }

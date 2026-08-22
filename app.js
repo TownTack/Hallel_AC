@@ -9,6 +9,7 @@ const methodOverride = require('method-override');
 
 const env = require('./config/env');
 const connectDB = require('./config/db');
+const { sweepExpiredHolds } = require('./services/holds');
 const Settings = require('./models/Settings');
 const User = require('./models/User');
 
@@ -102,10 +103,22 @@ app.use((err, req, res, next) => {
 });
 
 // ---- Boot ----
+// Release slots whose Hubtel checkout was abandoned. Availability already
+// ignores a lapsed hold, so this is housekeeping rather than correctness: it
+// moves those rows to 'cancelled' so they stop showing as live jobs.
+const HOLD_SWEEP_MS = 5 * 60 * 1000;
+
 async function start() {
   await connectDB();
   await Settings.get();            // ensure the singleton settings doc exists
   await User.seedAdmin(env.admin); // seed initial admin if none
+
+  sweepExpiredHolds().catch((e) => console.error("[holds] sweep failed:", e.message));
+  const sweeper = setInterval(() => {
+    sweepExpiredHolds().catch((e) => console.error("[holds] sweep failed:", e.message));
+  }, HOLD_SWEEP_MS);
+  sweeper.unref(); // never hold the process open just for the sweeper
+
   app.listen(env.port, () => {
     console.log(`[app] Hallel AquaCare running on ${env.baseUrl}`);
   });

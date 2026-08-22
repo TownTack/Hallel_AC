@@ -68,7 +68,13 @@
     <div class="table-responsive">
       <table class="table table-sm align-middle">
         <thead>
-          <tr><th>Size key</th><th>Label</th><th>Litres</th><th>Standard</th><th>Preserve</th><th>Custom</th></tr>
+          <tr>
+            <th>Size key</th><th>Label</th><th>Litres</th>
+            <th>Standard</th><th>Preserve</th>
+            <th title="Active crew minutes to clean one tank of this size">Std mins</th>
+            <th title="Clean &amp; Preserve takes longer: the water is transferred out and back">Pres. mins</th>
+            <th>Custom</th>
+          </tr>
         </thead>
         <tbody>
           <% cfg.priceList.forEach(p => { %>
@@ -78,13 +84,174 @@
               <td><input name="capacityLitres" type="number" class="form-control form-control-sm" value="<%= p.capacityLitres %>" style="max-width:100px" /></td>
               <td><input name="standardPrice" type="number" step="any" class="form-control form-control-sm" value="<%= p.standardPrice %>" style="max-width:100px" /></td>
               <td><input name="preservePrice" type="number" step="any" class="form-control form-control-sm" value="<%= p.preservePrice %>" style="max-width:100px" /></td>
+              <td><input name="standardCleanMin" type="number" min="0" class="form-control form-control-sm" value="<%= p.standardCleanMin %>" style="max-width:85px" /></td>
+              <td><input name="preserveCleanMin" type="number" min="0" class="form-control form-control-sm" value="<%= p.preserveCleanMin %>" style="max-width:85px" /></td>
               <td class="text-center"><input type="checkbox" name="custom" value="<%= p.sizeKey %>" <%= p.custom ? 'checked' : '' %> /></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
-    <p class="text-muted small mb-0">Size keys are fixed identifiers — edit labels and prices freely. "Custom" flags sizes we quote manually.</p>
+    <p class="text-muted small mb-0">
+      Size keys are fixed identifiers — edit labels and prices freely. "Custom" flags
+      sizes we quote manually. The minute columns are <strong>active crew time per
+      tank</strong>: the shared site set-up and the chlorine hold are added once per
+      visit from the scheduling settings below, not per tank.
+    </p>
+  </div>
+
+  <!-- Scheduling -->
+  <div class="card booking-card p-4 mb-4">
+    <h5 class="section-title mb-3">Scheduling &amp; availability</h5>
+    <p class="text-muted small">
+      These drive which arrival windows customers are offered. Job length is
+      computed as <em>site set-up + cleaning minutes per tank + chlorine hold +
+      (tanks &minus; 1) &times; multi-tank stagger</em>.
+    </p>
+
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Crew leaves base</label>
+        <input name="workDayStart" type="time" class="form-control" value="<%= cfg.scheduling.workDayStart %>" />
+        <div class="form-text">Drive time to the first job starts here, so the earliest arrival is later than this.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Crew back at base</label>
+        <input name="workDayEnd" type="time" class="form-control" value="<%= cfg.scheduling.workDayEnd %>" />
+        <div class="form-text">A job must finish AND the crew get home by this time.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Working days</label>
+        <div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="0"
+               id="wd0" <%= cfg.scheduling.workingDays.includes(0) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd0">Sun</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="1"
+               id="wd1" <%= cfg.scheduling.workingDays.includes(1) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd1">Mon</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="2"
+               id="wd2" <%= cfg.scheduling.workingDays.includes(2) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd2">Tue</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="3"
+               id="wd3" <%= cfg.scheduling.workingDays.includes(3) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd3">Wed</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="4"
+               id="wd4" <%= cfg.scheduling.workingDays.includes(4) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd4">Thu</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="5"
+               id="wd5" <%= cfg.scheduling.workingDays.includes(5) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd5">Fri</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="workingDays" value="6"
+               id="wd6" <%= cfg.scheduling.workingDays.includes(6) ? "checked" : "" %> />
+        <label class="form-check-label" for="wd6">Sat</label>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <hr />
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Site set-up (mins)</label>
+        <input name="siteSetupMin" type="number" min="0" class="form-control" value="<%= cfg.scheduling.siteSetupMin %>" />
+        <div class="form-text">Charged once per visit, however many tanks.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Chlorine hold (mins)</label>
+        <input name="chlorineHoldMin" type="number" min="0" class="form-control" value="<%= cfg.scheduling.chlorineHoldMin %>" />
+        <div class="form-text">Contact time the crew waits on site.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Multi-tank stagger (mins)</label>
+        <input name="multiTankStaggerMin" type="number" min="0" class="form-control" value="<%= cfg.scheduling.multiTankStaggerMin %>" />
+        <div class="form-text">Added per EXTRA tank. Lower than a full tank cycle because the crew overlaps the next set-up with the previous hold.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Arrival window (mins)</label>
+        <input name="arrivalWindowMin" type="number" min="0" class="form-control" value="<%= cfg.scheduling.arrivalWindowMin %>" />
+        <div class="form-text">The promise shown to the client, e.g. 45 gives "07:15 – 08:00".</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Slot step (mins)</label>
+        <input name="slotStepMin" type="number" min="0" class="form-control" value="<%= cfg.scheduling.slotStepMin %>" />
+        <div class="form-text">Spacing of the offered start times.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Minimum turnaround (mins)</label>
+        <input name="minTurnaroundMin" type="number" min="0" class="form-control" value="<%= cfg.scheduling.minTurnaroundMin %>" />
+        <div class="form-text">Gap between two clients — covers sanitising the holding tank and hoses. Travel time replaces it when the drive is longer.</div>
+      </div>
+    </div>
+
+    <hr />
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Average speed (km/h)</label>
+        <input name="travelSpeedKmh" type="number" min="0" class="form-control" value="<%= cfg.scheduling.travelSpeedKmh %>" />
+        <div class="form-text">Used to turn distance into drive time.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Road factor</label>
+        <input name="travelRoadFactor" type="number" step="0.05" min="1" class="form-control" value="<%= cfg.scheduling.travelRoadFactor %>" />
+        <div class="form-text">Only applied to straight-line (haversine) distance. Road providers already return real distance.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Max jobs per day</label>
+        <input name="maxJobsPerDay" type="number" min="0" class="form-control" value="<%= cfg.scheduling.maxJobsPerDay %>" />
+        <div class="form-text">Safety ceiling for rinse water, chemicals and crew fatigue.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Minimum notice (hours)</label>
+        <input name="minLeadTimeHours" type="number" min="0" class="form-control" value="<%= cfg.scheduling.minLeadTimeHours %>" />
+        <div class="form-text">Never allowed below the cancellation cutoff, or a client could book something they cannot change.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Booking horizon (days)</label>
+        <input name="maxHorizonDays" type="number" min="0" class="form-control" value="<%= cfg.scheduling.maxHorizonDays %>" />
+        <div class="form-text">How far ahead customers may book.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Cancellation cutoff (hours)</label>
+        <input name="cancellationCutoffHours" type="number" min="0" class="form-control" value="<%= cfg.scheduling.cancellationCutoffHours %>" />
+        <div class="form-text">Clients may cancel or move a booking freely until this close to the service.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Checkout hold (mins)</label>
+        <input name="holdTtlMinutes" type="number" min="0" class="form-control" value="<%= cfg.scheduling.holdTtlMinutes %>" />
+        <div class="form-text">How long a slot stays reserved while a client is paying. Abandoned checkouts release the slot after this.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Holding tank (litres)</label>
+        <input name="holdingTankLitres" type="number" min="0" class="form-control" value="<%= cfg.scheduling.holdingTankLitres %>" />
+        <div class="form-text">Clean &amp; Preserve is refused for tanks larger than this.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Commitment deposit (%)</label>
+        <input name="commitmentDepositPct" type="number" min="0" max="100" step="any" class="form-control" value="<%= cfg.commitmentDepositPct %>" />
+        <div class="form-text">Taken on every booking. Outside the free radius it is charged on top of the transport fee.</div>
+      </div>
+    </div>
+
+    <hr />
+    <div>
+      <label class="form-label">Blackout dates</label>
+      <textarea name="blackoutDates" rows="3" class="form-control"
+                placeholder="2026-12-25&#10;2026-12-26"><%= (cfg.scheduling.blackoutDates || []).map(d => new Date(d).toISOString().slice(0,10)).join(String.fromCharCode(10)) %></textarea>
+      <div class="form-text">One date per line (YYYY-MM-DD). No bookings are offered on these days.</div>
+    </div>
   </div>
 
   <button class="btn btn-primary" type="submit">Save settings</button>

@@ -43,6 +43,15 @@
       if (out.ok) alert('Certificate details saved.');
     });
 
+    const cancelForm = content.querySelector('.js-cancel');
+    if (cancelForm) cancelForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(cancelForm, e.submitter).entries());
+      const out = await patch(`/admin/bookings/${id}/cancel`, data);
+      if (out.ok) refreshAfterAction(id);
+      else alert(out.error || 'Could not cancel this booking.');
+    });
+
     const settleForm = content.querySelector('.js-settle');
     if (settleForm) settleForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -63,6 +72,17 @@
     tile.addEventListener('click', () => openDetail(tile.dataset.id))
   );
 
-  // Reload the dashboard list when the modal closes (to update dots/badges).
-  modalEl.addEventListener('hidden.bs.modal', () => window.location.reload());
+  // The Calendar tab opens the same detail modal rather than building its own.
+  window.openBookingDetail = openDetail;
+
+  // Refresh whatever view is on screen when the modal closes. Reloading the
+  // page from the Calendar tab would bounce the operator back to the list, so
+  // that case just tells the calendar to refetch.
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    if (document.querySelector('#pane-calendar.active')) {
+      document.dispatchEvent(new CustomEvent('hallel:booking-changed'));
+      return;
+    }
+    window.location.reload();
+  });
 })();

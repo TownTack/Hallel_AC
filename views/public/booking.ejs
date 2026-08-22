@@ -49,16 +49,7 @@
               >
               <input name="email" type="email" class="form-control" />
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Preferred service date</label>
-              <input
-                name="bookingDate"
-                type="date"
-                class="form-control"
-                min="<%= new Date().toISOString().slice(0,10) %>"
-                required
-              />
-            </div>
+
           </div>
 
           <!-- Service types (informational) -->
@@ -132,6 +123,44 @@
           <input type="hidden" name="tanks" id="tanksInput" />
         </div>
 
+        <!-- ============ When should we come? ============
+             Comes AFTER tanks and location on purpose: the job length is
+             derived from the cart and reachability from the map pin, so no
+             time can be offered until both exist. -->
+        <div class="mb-4" id="scheduleSection">
+          <h5 class="section-title mb-3">Choose your arrival window</h5>
+
+          <div id="schedulePrompt" class="text-muted small mb-2">
+            Add your tanks and pick your location above, then we will show the
+            times our crew can come.
+          </div>
+
+          <div id="slotPickerWrap" class="d-none">
+            <div id="slotPicker"></div>
+            <div id="chosenSlot" class="slot-chosen small mt-2 d-none"></div>
+            <div id="durationNote" class="form-text"></div>
+          </div>
+
+          <!-- Custom-priced tanks have no estimable duration, so they skip live
+               availability: the client asks for a day and we confirm the time. -->
+          <div id="customDateWrap" class="d-none">
+            <label class="form-label">Preferred service date</label>
+            <input
+              id="customDate"
+              type="date"
+              class="form-control"
+              min="<%= new Date().toISOString().slice(0,10) %>"
+            />
+            <div class="form-text">
+              This tank needs a site visit to price, so we will call you to agree
+              a price and confirm an exact arrival time.
+            </div>
+          </div>
+
+          <input type="hidden" name="startAt" id="startAt" />
+          <input type="hidden" name="bookingDate" id="bookingDate" />
+        </div>
+
         <!-- ================= Right: live summary ================= -->
         <div class="col-lg-5">
           <div class="summary-box p-4 sticky-top" style="top: 1rem">
@@ -162,12 +191,17 @@
               <span class="total" id="sumTotal">GHS 0.00</span>
             </div>
 
+            <div id="depositRow" class="d-flex justify-content-between mt-2 small d-none">
+              <span>Due now to confirm</span><span id="sumDueNow">GHS 0.00</span>
+            </div>
+            <div id="depositNote" class="small text-white-50 d-none"></div>
+
             <!-- Pay now -->
             <div class="mt-4">
               <label class="form-label">Payment</label>
               <select name="payNowChoice" id="payNowChoice" class="form-select">
-                <option value="later">Pay later / on-site</option>
-                <option value="now">Pay now</option>
+                <option value="later">Pay deposit now, balance on-site</option>
+                <option value="now">Pay the full amount now</option>
               </select>
               <div id="payNote" class="small text-warning mt-2 d-none"></div>
             </div>
@@ -192,7 +226,10 @@
   {
     "priceList": <%- JSON.stringify(priceList) %>,
     "baseLocation": <%- JSON.stringify(baseLocation) %>,
-    "freeRadiusKm": <%= freeRadiusKm %>
+    "freeRadiusKm": <%= freeRadiusKm %>,
+    "scheduling": <%- JSON.stringify(scheduling) %>,
+    "commitmentDepositPct": <%= commitmentDepositPct %>
   }
 </script>
+<script defer src="/js/slot-picker.js"></script>
 <script defer src="/js/booking.js"></script>

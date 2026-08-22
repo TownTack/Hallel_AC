@@ -77,9 +77,15 @@ async function computeQuote(
 
   const total = round2(jobSubtotal + transportFee);
 
-  // Pay-now rules: outside radius forces the transport fee as a commitment deposit.
-  const payNowRequired = !free;
-  const mandatoryAmount = free ? 0 : transportFee;
+  // ---- Pay-now rules ----
+  // Every booking takes a commitment deposit: a pct of the job subtotal, which
+  // secures the slot and is forfeited on a late cancellation. Outside the free
+  // radius the transport fee is charged on TOP of it — the fee covers a real
+  // cost (fuel), the deposit covers commitment, so they are not interchangeable.
+  const depositPct = Number(settings.commitmentDepositPct) || 0;
+  const commitmentDeposit = round2((jobSubtotal * depositPct) / 100);
+  const mandatoryAmount = round2(transportFee + commitmentDeposit);
+  const payNowRequired = mandatoryAmount > 0;
 
   return {
     lines,
@@ -95,6 +101,8 @@ async function computeQuote(
     transportFee,
     free,
     total,
+    commitmentDepositPct: depositPct,
+    commitmentDeposit,
     payNowRequired,
     mandatoryAmount,
     hasCustom, // labels of custom-priced sizes needing a manual quote

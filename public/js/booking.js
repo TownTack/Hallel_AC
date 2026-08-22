@@ -117,6 +117,7 @@
   }
 
   // ---------------- Live quote ----------------
+  let lastQuote = null;
   let debounce;
   function refreshQuote() {
     clearTimeout(debounce);
@@ -142,7 +143,9 @@
         body: JSON.stringify(payload),
       });
       const { quote } = await res.json();
+      lastQuote = quote;
       renderQuote(quote);
+      syncSchedule(quote);
     } catch (_) { /* leave last render */ }
   }
 
@@ -177,20 +180,164 @@
       paySelect.value = 'later';
       paySelect.disabled = true;
       payNote.classList.add('d-none');
+      // No settled total, so there is nothing to take a deposit on yet.
+      renderDeposit(q);
       return;
     }
     customNote.classList.add('d-none');
     paySelect.disabled = false;
 
-    // Pay-now rule: outside radius forces the transport fee as a commitment.
-    if (q.payNowRequired) {
-      paySelect.value = 'now';
-      payNote.textContent = `You're outside our free radius — the transport fee of ${money(q.transportFee)} is required now as a commitment. The rest is paid on-site.`;
-      payNote.classList.remove('d-none');
-    } else {
-      payNote.classList.add('d-none');
-    }
+    // Every booking takes a commitment deposit, so there is always something
+    // to pay now. The choice is only deposit-now vs everything-now.
+    payNote.classList.add('d-none');
+    renderDeposit(q);
   }
+
+  // What the client actually has to pay before the slot is confirmed.
+  function renderDeposit(q) {
+    const row = document.getElementById('depositRow');
+    const note = document.getElementById('depositNote');
+    const paySelect = document.getElementById('payNowChoice');
+    if (!q || (q.hasCustom && q.hasCustom.length)) {
+      row.classList.add('d-none');
+      note.classList.add('d-none');
+      return;
+    }
+    const payFull = paySelect.value === 'now';
+    const dueNow = payFull ? q.total : q.mandatoryAmount;
+    document.getElementById('sumDueNow').textContent = money(dueNow);
+    row.classList.remove('d-none');
+
+    if (payFull) {
+      note.textContent = 'You are paying the full amount online.';
+    } else if (q.transportFee > 0) {
+      note.textContent = `A ${q.commitmentDepositPct}% commitment deposit (${money(q.commitmentDeposit)}) plus the ${money(q.transportFee)} transport fee secures your slot. The balance is paid on-site.`;
+    } else {
+      note.textContent = `A ${q.commitmentDepositPct}% commitment deposit (${money(q.commitmentDeposit)}) secures your slot. The balance is paid on-site.`;
+    }
+    note.classList.remove('d-none');
+  }
+
+  // ---------------- Arrival window ----------------
+  // The picker only renders what /api/availability returns; POST /booking
+  // re-checks the chosen time, so nothing here decides feasibility.
+  let picker = null;
+  let lastAvailabilitySig = '';
+
+  function el(id) { return document.getElementById(id); }
+
+  function hasLocation() {
+    return !!(el('lat').value && el('lng').value);
+  }
+
+  // Availability depends on the cart (job length) and the pin (drive time),
+  // so any change to either invalidates an already-chosen window.
+  function availabilitySignature() {
+    return JSON.stringify(collectTanks()) + '|' + el('lat').value + '|' + el('lng').value;
+  }
+
+  function clearSlot() {
+    el('startAt').value = '';
+    el('bookingDate').value = '';
+    el('chosenSlot').classList.add('d-none');
+  }
+
+  function humanDuration(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    const hp = h ? h + (h === 1 ? ' hour' : ' hours') : '';
+    const mp = m ? m + ' mins' : '';
+    return [hp, mp].filter(Boolean).join(' ');
+  }
+
+  function prettyDay(key) {
+    const d = new Date(key + 'T00:00:00Z');
+    return d.toLocaleDateString('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+    });
+  }
+
+  function buildPicker() {
+    return HallelSlotPicker.create({
+      root: el('slotPicker'),
+      promptText: 'Pick a date to see the times our crew can come.',
+      load: function (from, to) {
+        return fetch('/api/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tanks: JSON.stringify(collectTanks()),
+            lat: el('lat').value,
+            lng: el('lng').value,
+            from: from,
+            to: to,
+          }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.durationMin) {
+              el('durationNote').textContent =
+                'This job takes about ' + humanDuration(data.durationMin) +
+                ', including the 2-hour disinfection hold. We hold the whole window for you.';
+            }
+            return data;
+          });
+      },
+      onSelect: function (startAt, label, dateKey) {
+        el('startAt').value = startAt;
+        el('bookingDate').value = dateKey;
+        const chosen = el('chosenSlot');
+        chosen.textContent = 'Our crew will arrive on ' + prettyDay(dateKey) + ' between ' + label + '.';
+        chosen.classList.remove('d-none');
+      },
+    });
+  }
+
+  function syncSchedule(q) {
+    const wrap = el('slotPickerWrap');
+    const prompt = el('schedulePrompt');
+    const customWrap = el('customDateWrap');
+    const isCustom = !!(q && q.hasCustom && q.hasCustom.length);
+
+    // Custom-priced tanks cannot be estimated, so they ask for a day instead
+    // of a window and we confirm the time by phone.
+    if (isCustom) {
+      wrap.classList.add('d-none');
+      prompt.classList.add('d-none');
+      customWrap.classList.remove('d-none');
+      clearSlot();
+      lastAvailabilitySig = '';
+      return;
+    }
+    customWrap.classList.add('d-none');
+
+    if (!hasLocation() || !q || !q.lines.length) {
+      wrap.classList.add('d-none');
+      prompt.classList.remove('d-none');
+      clearSlot();
+      lastAvailabilitySig = '';
+      return;
+    }
+
+    prompt.classList.add('d-none');
+    wrap.classList.remove('d-none');
+
+    const sig = availabilitySignature();
+    if (picker && sig === lastAvailabilitySig) return;
+    lastAvailabilitySig = sig;
+    clearSlot();
+    if (!picker) picker = buildPicker();
+    picker.reset();
+    picker.refresh();
+  }
+
+  el('customDate').addEventListener('change', function () {
+    el('bookingDate').value = el('customDate').value;
+  });
+
+  document.getElementById('payNowChoice').addEventListener('change', () => {
+    if (lastQuote) renderDeposit(lastQuote);
+  });
 
   // ---------------- Submit guard ----------------
   document.getElementById('bookingForm').addEventListener('submit', (e) => {
@@ -199,6 +346,17 @@
     if (!document.getElementById('lat').value || !document.getElementById('lng').value) {
       e.preventDefault();
       alert('Please pick your service location on the map.');
+      return;
+    }
+    const custom = !!(lastQuote && lastQuote.hasCustom && lastQuote.hasCustom.length);
+    if (!custom && !document.getElementById('startAt').value) {
+      e.preventDefault();
+      alert('Please choose an arrival window.');
+      return;
+    }
+    if (custom && !document.getElementById('bookingDate').value) {
+      e.preventDefault();
+      alert('Please pick a preferred service date.');
       return;
     }
     document.getElementById('tanksInput').value = JSON.stringify(tanks);
